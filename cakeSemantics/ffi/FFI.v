@@ -22,7 +22,7 @@ Inductive io_event : Set :=
 Inductive final_event : Set :=
 | Final_event : string -> list word8 -> list word8 -> ffi_outcome -> final_event.
 
-Definition ffi_state (ffi' : Type) := prod (prod (oracle ffi') ffi') (list io_event).
+Definition ffi_state (ffi' : Type) := (((oracle ffi') * ffi') * (list io_event))%type.
 
 Definition initial_ffi_state {ffi' : Type} (oc : oracle ffi') (ffi : ffi') : ffi_state ffi' :=
   (oc, ffi, []).

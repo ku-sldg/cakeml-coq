@@ -102,7 +102,7 @@ Fixpoint nsLookupMod {M N V : Type} `{EqDec M} `{EqDec N} (ns : namespace M N V)
                              ms
   end.
 
-Definition nsEmpty {M N V : Type} := @nil (alist (ident M N) V).
+Definition nsEmpty {M N V : Type} := @nil ((ident M N) * V).
 
 Definition nsAppend {M N V : Type} (ns1 : namespace M N V) (ns2 : namespace M N V) : namespace M N V :=
   ns1 ++ ns2.

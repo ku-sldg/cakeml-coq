@@ -274,6 +274,13 @@ Record state (A : Type) :=
     next_exn_stamp : nat
   }.
 
+Arguments clock {A} _.
+Arguments refs {A} _.
+Arguments ffi {A} _.
+Arguments next_type_stamp {A} _.
+Arguments next_exn_stamp {A} _.
+Arguments refs {A} _.
+
 (* Other primitives *)
 Definition do_con_check (cenv : env_ctor)
            (n_opt : option (ident modN conN))
@@ -916,3 +923,6 @@ Definition build_constrs (s : nat) (condefs : list (conN * (list stamp)) ) :=
     (fun p => match p with (conN,ts) =>
                         (conN,(length ts, TypeStamp conN s)) end)
     condefs.
+
+Definition extend_dec_env (env env' : sem_env val) : sem_env val :=
+  {| sev := nsAppend (sev env) (sev env'); sec := nsAppend (sec env) (sec env')|}.

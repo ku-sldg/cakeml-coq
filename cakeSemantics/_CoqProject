@@ -2,8 +2,8 @@
 Word.v
 Namespace.v
 Utils.v
-SemanticPrimitives.v
 CakeAST.v
-SmallSem.v
+SemanticPrimitives.v
+RelationalBigStep.v
 ffi/FFI.v
 ffi/SimpleIO.v
