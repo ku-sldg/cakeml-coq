@@ -918,11 +918,19 @@ Definition do_if (v : val) (e1 e2 : exp) : option exp :=
 
 (* Semantic helpers *)
 
-Definition build_constrs (s : nat) (condefs : list (conN * (list stamp)) ) :=
+Definition build_constrs (s : nat) (condefs : list (conN * (list ast_t)) ) :=
   List.map
     (fun p => match p with (conN,ts) =>
                         (conN,(length ts, TypeStamp conN s)) end)
     condefs.
+
+Fixpoint build_tdefs (n : nat) (tds : list (list tvarN * typeN * list (conN * list ast_t))) : env_ctor :=
+  match tds with
+  | [] => alist_to_ns []
+  | (tvars,tn,condefs)::tds' => nsAppend
+                                (build_tdefs (n + 1) tds')
+                                (alist_to_ns (List.rev (build_constrs n condefs)))
+  end.
 
 Definition extend_dec_env (env env' : sem_env val) : sem_env val :=
   {| sev := nsAppend (sev env) (sev env'); sec := nsAppend (sec env) (sec env')|}.
