@@ -433,7 +433,9 @@ Inductive dec : Set :=
 | Dtype : locs -> typeDef -> dec
 | Dtabbrev : locs -> list tvarN -> typeN -> ast_t -> dec
 | Dexn : locs -> conN -> list ast_t -> dec
-| Dmod : modN -> list dec -> dec.
+| Dmod : modN -> list dec -> dec
+| Dlocal : list dec -> list dec -> dec.
+
 
 Fixpoint dec_rect (P : dec -> Type)
          (H1 : forall (l : locs) (p : pat) (e : exp), P (Dlet l p e))
@@ -442,6 +444,7 @@ Fixpoint dec_rect (P : dec -> Type)
          (H4 : forall (l : locs) (lt : list tvarN) (t : typeN) (a : ast_t), P (Dtabbrev l lt t a))
          (H5 : forall (l : locs) (c : conN) (la : list ast_t), P (Dexn l c la))
          (H6 : forall (m : modN) (l : list dec), Forall'' dec P l -> P (Dmod m l))
+         (H7 : forall (l0 : list dec) (l1 : list dec), Forall'' dec P l0 -> Forall'' dec P l1 -> P (Dlocal l0 l1))
          (d : dec) : P d :=
   match d with
   | Dlet l p e => H1 l p e
@@ -452,10 +455,17 @@ Fixpoint dec_rect (P : dec -> Type)
   | Dmod m l => let fix loop (l : list dec) :=
                    match l with
                    | [] => Forall_nil'' dec P
-                   | h::t => Forall_cons'' dec P h t (dec_rect P H1 H2 H3 H4 H5 H6 h) (loop t)
+                   | h::t => Forall_cons'' dec P h t (dec_rect P H1 H2 H3 H4 H5 H6 H7 h) (loop t)
                    end
                in
                H6 m l (loop l)
+  | Dlocal l0 l1 => let fix loop (l : list dec) :=
+                       match l with
+                       | [] => Forall_nil'' dec P
+                       | h::t => Forall_cons'' dec P h t (dec_rect P H1 H2 H3 H4 H5 H6 H7 h) (loop t)
+                       end
+                   in
+               H7 l0 l1 (loop l0) (loop l1)
   end.
 
 Definition dec_rec (P : dec -> Set) := dec_rect P.
@@ -471,6 +481,34 @@ Proof. decide equality; auto with DecidableEquality.
        destruct (p d); destruct (IHForall'' l0);
          try (rewrite e, e0; left; reflexivity);
          try (right; intro con; inversion con; auto).
+
+       Restart.
+       decide equality; auto with DecidableEquality.
+       apply list_eq_dec. decide equality; auto with DecidableEquality.
+       decide equality; auto with DecidableEquality.
+       generalize dependent l0.
+       induction H.
+       destruct l0. left; reflexivity. right; discriminate.
+       destruct l0. destruct (p d0). right; discriminate. right; discriminate. destruct (IHForall'' l0).
+       destruct (p d). rewrite e, e0. left; reflexivity. right; intro con; inversion con; auto.
+       destruct (p d). rewrite e. right; intro con; inversion con; auto.
+       right; intro con; inversion con; auto.
+
+       generalize dependent l2.
+       induction H0.
+       destruct l2. left; reflexivity. right; discriminate.
+       destruct l2. right; discriminate. destruct (IHForall'' l2).
+       destruct (p d). rewrite e, e0. left; reflexivity. right; intro con; inversion con; auto.
+       destruct (p d). rewrite e. right; intro con; inversion con; auto.
+       right; intro con; inversion con; auto.
+
+       generalize dependent l.
+       induction H.
+       destruct l. left; reflexivity. right; discriminate.
+       destruct l0. right; discriminate. destruct (IHForall'' l0).
+       destruct (p d). rewrite e, e0. left; reflexivity. right; intro con; inversion con; auto.
+       destruct (p d). rewrite e. right; intro con; inversion con; auto.
+       right; intro con; inversion con; auto.
 Qed.
 Hint Resolve dec_eq_dec : DecidableEquality.
 
