@@ -1,3 +1,8 @@
+(* Assumptions *)
+(* This definition assumes the existence of a verified type checker that checks: *)
+(*   1. function arguments *)
+(*   2. constructor definitions *)
+(* and that this type checker will analyze the code before it's executed using these semantics *)
 Require Import CakeSem.Namespace.
 Require Import CakeSem.Utils.
 Require Import CakeSem.Word.
@@ -74,11 +79,11 @@ Inductive pmatchR : store val -> sem_env val -> pat -> val -> match_result (sem_
                  (ps : list pat) (vs : list val),
     (* 0. one name exists and the other does not *)
     (on = Some n /\ os = None) \/ (on = None /\ os = Some s') \/
-    (* 1. constructor stamp is not in env *)
+    (* 1. constructor stamp is not in env *) (* Should be caught during type checking *)
     (on = Some n /\ nsLookup n (sec env) = None) \/
-    (* 2. stamp is in env but has different type or number of args and match number of patterns unequal *)
+    (* 2. stamp is in env but has different type or number of args and match number of patterns unequal *) (* Should be caught by typechecking *)
     (on = Some n /\ nsLookup n (sec env) = Some (l,s) /\ s <> s') \/ l <> length ps \/
-    (* 3. not every argument matches its corresponding pattern *)
+    (* 3. not every argument matches its corresponding pattern *) (* Should be caught by typechecking *)
     pmatchlistR sto env ps vs No_match -> pmatchR sto env (Pcon on ps) (Conv os vs) No_match
 
 | match_Pref : forall (sto : store val) (env env' : sem_env val) (lnum : nat) (p : pat) (v : val),
@@ -87,7 +92,7 @@ Inductive pmatchR : store val -> sem_env val -> pat -> val -> match_result (sem_
 | match_Ptannot : forall (sto : store val) (env : sem_env val) (p : pat) (v : val) (t : ast_t) (m : match_result (sem_env val)),
     pmatchR sto env p v m -> pmatchR sto env (Ptannot p t) v m
 
-(* matching lengths of pattern arguments and constructor arguments enforced by pmatchlistR *)
+(* matching lengths of pattern arguments and constructor arguments enforced by pmatchlistR *) (* type checking's problem? *) (* Not if there's incomplete pattern matching *)
 with pmatchlistR : store val -> sem_env val -> list pat -> list val -> match_result (sem_env val) -> Prop :=
 | pmatch_empty : forall (sto : store val) (env : sem_env val), pmatchlistR sto env [] [] (Match env)
 | pmatch_cons_succ : forall (sto : store val) (env env' env'' : sem_env val) (p : pat) (ps : list pat) (v : val) (vs : list val),
@@ -108,8 +113,9 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
     expR A st env (EHandle e l) (st'', r)
 
 (* might be too many helper functions here: do_con_check is hiding alot and rev is usually a pain when trying to use abstractly *)
+(* do_con_check might be an unnecessary step because type checking ensures constructors are applied to correct number/type of arguments *)
 | EConNamed_R : forall (st' : state A) (es : list exp) (vs : list val) (o : option (ident modN conN)) (i : ident modN conN) (n : nat) (s : stamp),
-    do_con_check (sec env) o n = true -> argR A st env (rev es) (st', Rval vs) -> expR A st env (ECon o es) (st', Rval (Conv (Some s) vs))
+    do_con_check (sec env) o n = true -> argR A st env es (st', Rval vs) -> expR A st env (ECon o es) (st', Rval (Conv (Some s) vs))
 
 (* ??Anonymous Constructor?? *)
 (* only needed if getting rid of do_con_check*)
@@ -123,13 +129,13 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
 | EFun_R : forall (e : exp) (v : val) (vname : varN),
     expR A st env (EFun vname e) (st, Rval (Closure env vname e))
 
-(* old one *)
+(* old one *) (* changed because ...?  *)
 (* | EFun_R : forall (env env' : sem_env val) (sev' : env_val) (e : exp) (v : val) (vname : varN), *)
 (*     expR env e (Rval v) -> sev' = nsBind vname v (sev env) -> env' = {| sev := sev'; sec := (sec env) |} -> *)
 (*     expR env (EFun vname e) (Rval (Closure env' vname e)) *)
 
 | EAppPrimitive_R : forall (st' st'' : state A) (s s' : store val) (t t' : ffi_state A) (o : op) (es : list exp) (v : val) (vs : list val),
-    argR A st env (rev es) (st', Rval vs) -> appR _ A (refs st') (ffi st') o vs s' t' v ->
+    argR A st env es (st', Rval vs) -> appR _ A (refs st') (ffi st') o vs s' t' v ->
     st'' = {| clock := clock st';
               refs := s';
               ffi := t';
@@ -138,7 +144,7 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
     expR A st env (EApp o es) (st'', Rval v)
 
 | EAppFunction_R  : forall (st' st'': state A) (env' : sem_env val)  (e : exp) (es : list exp) (v : val) (vs : list val),
-    argR A st env (rev es) (st', Rval vs) -> funcAppR vs env' e ->
+    argR A st env es (st', Rval vs) -> funcAppR vs env' e ->
     expR A st' {|sev := sev env'; sec := sec env|} e (st'', Rval v) -> expR A st env (EApp Opapp es) (st', Rval v)
 
 | ELogVal_R : forall (env' : sem_env val) (st' : state A) (op : lop) (e1 e2 : exp) (v v1: val),
@@ -184,15 +190,18 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
 with argR (A :Type) (st : state A) (env : sem_env val) : list exp -> ((state A) * result (list val) val) -> Prop :=
      | NoArgs : argR A st env [] (st, Rval [])
      | ArgsSucc : forall (st' st'' : state A) (e : exp) (v : val) (es : list exp) (vs : list val),
-         expR A st env e (st', Rval v) -> argR A st' env es (st'', Rval vs) -> argR A st env (e::es) (st', Rval (v::vs))
-     (* GTF = Going To Fail *)
-     | ArgsGTF : forall (st' st'' : state A) (e : exp) (v : val) (es : list exp) (err : error_result val),
-         expR A st env e (st', Rval v) -> argR A st' env es (st'', Rerr err) -> argR A st env (e::es) (st', Rerr err)
-     | ArgsFail : forall (st' st'': state A) (err : error_result val) (e : exp) (es : list exp),
-         expR A st env e (st', Rerr err) -> argR A st env (e::es) (st', Rerr err)
+         argR A st env es (st', Rval vs) -> expR A st' env e (st'', Rval v) ->
+         argR A st env (e::es) (st'', Rval (v::vs))
+     | ArgsFail : forall (st' st'': state A) (res_val : result (list val) val) (err : error_result val) (e : exp) (es : list exp),
+         argR A st env es (st', res_val) -> expR A st' env e (st'', Rerr err) ->
+         argR A st env (e::es) (st'', Rerr err)
+     | ArgsPrevFail : forall (st' st'' : state A) (e : exp) (v : val) (es : list exp) (err : error_result val),
+         argR A st env es (st', Rerr err) -> argR A st env (e::es) (st', Rerr err)
 
 (* Maybe separate out matR, not necessarily dependent on expR. *)
 (* Just return the expression or the error value?  *)
+(* This works because the order of execution isn't changing, the expression returned by the *)
+(* statement can still be evalutated as soon as it comes out of the match.  *)
 with matR (A : Type) (st : state A) (env : sem_env val) : val -> list (pat * exp) -> val -> (state A) * result val val -> Prop :=
      | matNil  : forall (v err_v : val), matR A st env v [] err_v (st, Rerr (Rraise err_v))
      | matConsMatch : forall (sto : store val) (env' : sem_env val) (v err_v : val) (p : pat) (e :exp)
@@ -208,42 +217,72 @@ Inductive combineDecResultR (env : sem_env val) : result (sem_env val) val -> re
     combineDecResultR env (Rval env') (Rval {| sev := nsAppend (sev env') (sev env);
                                                sec := nsAppend (sec env') (sec env) |}).
 
-Inductive decR (A : Type) (st : state A) (env : sem_env val) : list dec -> (state A) * (result (sem_env val) val) -> Prop :=
-| Dnil_R : decR A st env [] (st, Rval {| sev := nsEmpty; sec := nsEmpty |})
-| DconsRval_R : forall (st' st'' : state A) (env' env'': sem_env val) (d : dec) (ds : list dec) (res res': result (sem_env val) val),
-    decR A st env [d] (st', res) -> combineDecResultR env res (Rval env') ->
-    decR A st' env' ds (st'', res) -> decR A st env (d::ds) (st'', Rval env'')
-| DconsRerr_R : forall (st' : state A) (d : dec) (ds : list dec) (res : result (sem_env val) val) (err_v : error_result val),
-    decR A st env [d] (st', res) -> combineDecResultR env res (Rerr err_v) ->
-    decR A st env (d::ds) (st', Rerr err_v)
-
-| Dlet_R : forall (st' st'' : state A) (env' : sem_env val) (sto : store val) (d : list dec) (l : locs)
+Inductive decR (A : Type) (st : state A) (env : sem_env val) : dec -> (state A) * (result (sem_env val) val) -> Prop :=
+| Dlet_R : forall (st' st'' : state A) (env' : sem_env val) (sto : store val) (l : locs)
              (p : pat) (e : exp) (v : val) (res : result (sem_env val) val),
     expR A st env e (st', Rval v) -> sto = refs st' -> pmatchR sto env p v (Match env') ->
-    decR A st' env' d (st'', res) -> decR A st env ((Dlet l p e)::d) (st'', res)
-| DletExpFail_R : forall (st' st'' : state A) (env' : sem_env val) (sto : store val) (d : list dec) (l : locs)
+    decR A st env (Dlet l p e) (st'', res)
+
+| DletExpFail_R : forall (st' st'' : state A) (env' : sem_env val) (sto : store val) (l : locs)
                     (p : pat) (e : exp) (err_v : error_result val) (res : result (sem_env val) val),
-    expR A st env e (st', Rerr err_v) -> decR A st env ((Dlet l p e)::d) (st', Rerr err_v)
-| DletMatFail_R : forall (st' st'' : state A) (env' : sem_env val) (sto : store val) (d : list dec) (l : locs)
+    expR A st env e (st', Rerr err_v) -> decR A st env (Dlet l p e) (st', Rerr err_v)
+
+| DletMatFail_R : forall (st' st'' : state A) (env' : sem_env val) (sto : store val) (l : locs)
                     (p : pat) (e : exp) (v : val) (res : result (sem_env val) val),
     expR A st env e (st', Rval v) -> sto = refs st' -> pmatchR sto env p v No_match ->
-    decR A st env ((Dlet l p e)::d) (st', res)
+    decR A st env (Dlet l p e) (st', res)
 
 (* Stuff hidden by build_rec_env *)
-(* Need error handling *)
-| Dletrec_R : forall (sev' : env_val) (l : locs) (funs : list (varN * varN * exp)) (d : list dec),
+| Dletrec_R : forall (sev' : env_val) (l : locs) (funs : list (varN * varN * exp)),
     sev' = build_rec_env funs env (sev env)->
-    decR A st env ((Dletrec l funs)::d) (st, Rval {| sev := sev' ; sec := sec env |}).
+    decR A st env (Dletrec l funs) (st, Rval {| sev := sev' ; sec := sec env |})
 
-| Dtype_R : forall (st'' : state A) (l : locs) (tds : typeDef) (tds : list dec),
+| Dtype_R : forall (env' : sem_env val) (st' st'' : state A) (res : result (sem_env val) val)
+              (l : locs) (t : typeDef) (tds : typeDef) ,
     st' = {| clock := clock st;
              refs := refs st;
              ffi := ffi st;
-             next_type_stamp := next_type_stamp st + length tds ;
+             next_type_stamp := next_type_stamp st + length tds;
              next_exn_stamp := next_exn_stamp st|} ->
     env' = {| sev := nsEmpty ; sec := build_tdefs (next_type_stamp st) tds |} ->
-    decR A st env' d (st') ->
-    decR A st env ((Dtype l t)::d) (st'', env' )
-(* | Dtabbrev_R :  *)
-(* | Dexn_R :  *)
-(* | Dmod_R :  *)
+    decR A st env (Dtype l t) (st', res)
+
+| Dtabbrev_R : forall (loc : locs) (res : result (sem_env val) val)
+                 (tvs : list tvarN) (tn : typeN) (t : ast_t),
+    res = Rval {| sev := nsEmpty; sec := nsEmpty |} ->
+    decR A st env (Dtabbrev loc tvs tn t) (st, res)
+
+| Dexn_R : forall (st' : state A) (res : result (sem_env val) val)
+             (loc : locs) (cn : conN) (ts : list ast_t),
+    st' = {| clock := clock st;
+             refs := refs st;
+             ffi := ffi st;
+             next_type_stamp := next_type_stamp st;
+             next_exn_stamp := next_exn_stamp st + 1|} ->
+    decR A st env (Dexn loc cn ts)
+         (st', Rval {| sev := nsEmpty; sec := nsSing cn (length ts, ExnStamp (next_exn_stamp st)) |}).
+
+(* | Dmod_R_Succ : forall (st' st'' : state A) (env' : sem_env val) (res : result (sem_env val) val) *)
+(*                   (mn : modN) (ds : list dec) , *)
+(*     decR A st env ds (st', Rval env') -> *)
+(*     decR A st' {| sev := nsLift mn (sev env'); sec := nsLift mn (sec env') |} d (st'', res) -> *)
+(*     decR A st env (Dmod mn ds) (st'', res). *)
+
+(* | Dmod_R_Fail : forall (st' : state A) (mn : modN) (ds : list dec) (d : list dec) (err_v : error_result val), *)
+(*     decR A st env ds (st', Rerr err_v) -> *)
+(*     decR A st env ((Dmod mn ds)::d) (st', Rerr err_v). *)
+
+(* | Dlocal : forall (st' st'' st''' : state A) (env' : sem_env val) (lds ds : list dec) *)
+(*              (d : list dec) (res : result (sem_env val) val), *)
+(*     decR A st env lds (st', Rval env') -> *)
+(*     decR A st' env' ds (st'', res) -> *)
+(*     decR A st env ((Dlocal lds ds)::d) (st'', res). *)
+
+(* Inductive decListR := *)
+(* | Dnil_R : decR A st env [] (st, Rval {| sev := nsEmpty; sec := nsEmpty |}) *)
+(* | DconsRval_R : forall (st' st'' : state A) (env' env'': sem_env val) (d : dec) (ds : list dec) (res res': result (sem_env val) val), *)
+(*     decR A st env [d] (st', res) -> combineDecResultR env res (Rval env') -> *)
+(*     decR A st' env' ds (st'', res) -> decR A st env (d::ds) (st'', Rval env'') *)
+(* | DconsRerr_R : forall (st' : state A) (d : dec) (ds : list dec) (res : result (sem_env val) val) (err_v : error_result val), *)
+(*     decR A st env [d] (st', res) -> combineDecResultR env res (Rerr err_v) -> *)
+(*     decR A st env (d::ds) (st', Rerr err_v) *)
