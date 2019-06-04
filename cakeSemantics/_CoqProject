@@ -1,9 +1,9 @@
 -R . CakeSem
+ffi/FFI.v
+ffi/SimpleIO.v
 Word.v
 Namespace.v
 Utils.v
 CakeAST.v
 SemanticPrimitives.v
 RelationalBigStep.v
-ffi/FFI.v
-ffi/SimpleIO.v
