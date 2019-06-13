@@ -260,29 +260,29 @@ Inductive decR (A : Type) (st : state A) (env : sem_env val) : dec -> (state A) 
              next_type_stamp := next_type_stamp st;
              next_exn_stamp := next_exn_stamp st + 1|} ->
     decR A st env (Dexn loc cn ts)
-         (st', Rval {| sev := nsEmpty; sec := nsSing cn (length ts, ExnStamp (next_exn_stamp st)) |}).
+         (st', Rval {| sev := nsEmpty; sec := nsSing cn (length ts, ExnStamp (next_exn_stamp st)) |})
 
-(* | Dmod_R_Succ : forall (st' st'' : state A) (env' : sem_env val) (res : result (sem_env val) val) *)
-(*                   (mn : modN) (ds : list dec) , *)
-(*     decR A st env ds (st', Rval env') -> *)
-(*     decR A st' {| sev := nsLift mn (sev env'); sec := nsLift mn (sec env') |} d (st'', res) -> *)
-(*     decR A st env (Dmod mn ds) (st'', res). *)
+| Dmod_R_Succ : forall (st' st'' : state A) (env' : sem_env val) (res : result (sem_env val) val)
+                  (mn : modN) (ds : list dec) (d : dec),
+    decListR A st env ds (st', Rval env') ->
+    decR A st' {| sev := nsLift mn (sev env'); sec := nsLift mn (sec env') |} d (st'', res) ->
+    decR A st env (Dmod mn ds) (st'', res)
 
-(* | Dmod_R_Fail : forall (st' : state A) (mn : modN) (ds : list dec) (d : list dec) (err_v : error_result val), *)
-(*     decR A st env ds (st', Rerr err_v) -> *)
-(*     decR A st env ((Dmod mn ds)::d) (st', Rerr err_v). *)
+| Dmod_R_Fail : forall (st' : state A) (mn : modN) (ds : list dec) (d : list dec) (err_v : error_result val),
+    decListR A st env ds (st', Rerr err_v) ->
+    decR A st env (Dmod mn ds) (st', Rerr err_v)
 
-(* | Dlocal : forall (st' st'' st''' : state A) (env' : sem_env val) (lds ds : list dec) *)
-(*              (d : list dec) (res : result (sem_env val) val), *)
-(*     decR A st env lds (st', Rval env') -> *)
-(*     decR A st' env' ds (st'', res) -> *)
-(*     decR A st env ((Dlocal lds ds)::d) (st'', res). *)
+| Dlocal : forall (st' st'' st''' : state A) (env' : sem_env val) (lds ds : list dec)
+             (d : list dec) (res : result (sem_env val) val),
+    decListR A st env lds (st', Rval env') ->
+    decListR A st' env' ds (st'', res) ->
+    decR A st env (Dlocal lds ds) (st'', res)
 
-(* Inductive decListR := *)
-(* | Dnil_R : decR A st env [] (st, Rval {| sev := nsEmpty; sec := nsEmpty |}) *)
-(* | DconsRval_R : forall (st' st'' : state A) (env' env'': sem_env val) (d : dec) (ds : list dec) (res res': result (sem_env val) val), *)
-(*     decR A st env [d] (st', res) -> combineDecResultR env res (Rval env') -> *)
-(*     decR A st' env' ds (st'', res) -> decR A st env (d::ds) (st'', Rval env'') *)
-(* | DconsRerr_R : forall (st' : state A) (d : dec) (ds : list dec) (res : result (sem_env val) val) (err_v : error_result val), *)
-(*     decR A st env [d] (st', res) -> combineDecResultR env res (Rerr err_v) -> *)
-(*     decR A st env (d::ds) (st', Rerr err_v) *)
+with decListR (A : Type) (st : state A) (env : sem_env val) : list dec -> (state A) * (result (sem_env val) val) -> Prop :=
+| Dnil_R : decListR A st env [] (st, Rval {| sev := nsEmpty; sec := nsEmpty |})
+| DconsRval_R : forall (st' st'' : state A) (env' env'': sem_env val) (d : dec) (ds : list dec) (res res': result (sem_env val) val),
+    decR A st env d (st', res) -> combineDecResultR env res (Rval env') ->
+    decListR A st' env' ds (st'', res) -> decListR A st env (d::ds) (st'', Rval env'')
+| DconsRerr_R : forall (st' : state A) (d : dec) (ds : list dec) (res : result (sem_env val) val) (err_v : error_result val),
+    decR A st env d (st', res) -> combineDecResultR env res (Rerr err_v) ->
+    decListR A st env (d::ds) (st', Rerr err_v).
