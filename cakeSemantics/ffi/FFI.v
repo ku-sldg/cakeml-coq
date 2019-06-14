@@ -3,30 +3,35 @@ Require Import CakeSem.Utils.
 
 Require Import Bool.Sumbool.
 
-Inductive ffi_outcome : Set := Ffi_failed | Ffi_diverged.
+Inductive ffi_outcome : Type :=
+  | Ffi_failed
+  | Ffi_diverged.
 
 Inductive oracle_result (ffi' : Type) : Type :=
-| Oracle_return : ffi' -> list word8 -> oracle_result ffi'
-| Oracle_final : ffi_outcome -> oracle_result ffi'.
+  | Oracle_return : ffi' -> list word8 -> oracle_result ffi'
+  | Oracle_final : ffi_outcome -> oracle_result ffi'.
 
-Definition oracle_function (ffi' : Type) := ffi' -> list word8 -> list word8 -> oracle_result ffi'.
+Definition oracle_function (ffi' : Type) : Type :=
+  ffi' -> list word8 -> list word8 -> oracle_result ffi'.
 
-Definition oracle (ffi' : Type) := string -> oracle_function ffi'.
+Definition oracle (ffi' : Type) : Type :=
+  string -> oracle_function ffi'.
 
-Inductive io_event : Set :=
-| Io_event : string -> list word8 -> list (word8 * word8) -> io_event.
+Inductive io_event : Type :=
+  | Io_event : string -> list word8 -> list (word8 * word8) -> io_event.
 
-Inductive final_event : Set :=
-| Final_event : string -> list word8 -> list word8 -> ffi_outcome -> final_event.
+Inductive final_event : Type :=
+  | Final_event : string -> list word8 -> list word8 -> ffi_outcome -> final_event.
 
-Definition ffi_state (ffi' : Type) := (((oracle ffi') * ffi') * (list io_event))%type.
+Definition ffi_state (ffi' : Type) : Type := 
+  (((oracle ffi') * ffi') * (list io_event))%type.
 
 Definition initial_ffi_state {ffi' : Type} (oc : oracle ffi') (ffi : ffi') : ffi_state ffi' :=
   (oc, ffi, nil).
 
 Inductive ffi_result (ffi' : Type) : Type :=
-| Ffi_return : ffi_state ffi' -> list word8 -> ffi_result ffi'
-| Ffi_final : final_event -> ffi_result ffi'.
+  | Ffi_return : ffi_state ffi' -> list word8 -> ffi_result ffi'
+  | Ffi_final : final_event -> ffi_result ffi'.
 
 Arguments ffi_result {ffi'}.
 
