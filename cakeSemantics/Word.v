@@ -1,3 +1,13 @@
+
+(* The Word module should use the same definitions as CompCert.
+   There is a functor that can be instantiated for the targeted word size.
+   https://github.com/artart78/coq-bits/blob/master/test/integers.v
+   See, e.g., the module Int64 defined in that file.
+   If more flexibility on the word size is needed, e.g., to make all
+   definitions parameteric in the word size, then let's discuss.
+   For the moment, I won't touch your current Word module. *)
+
+
 Require Import Arith.PeanoNat.
 Require Import Omega.
 Require Import ProofIrrelevance.

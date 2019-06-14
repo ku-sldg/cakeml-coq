@@ -44,7 +44,7 @@ Inductive funcAppR : list val -> sem_env val -> exp -> Prop :=
     clos = Closure env n e -> env' = {| sev := (nsBind n v (sev env)); sec := sec env|} -> funcAppR [clos; v] env'  e
 | app_OpappRecclosure : forall (clos v : val) (env env': sem_env val) (ev' : env_val) (l : list (varN * varN * exp)) (n : varN) (e : exp) (v : val),
     clos = Recclosure env l n ->
-    allDistinct string_dec (List.map (fun trip => match trip with (f,_,_) => f end) l) = true ->
+    LibList.noduplicates (List.map (fun trip => match trip with (f,_,_) => f end) l) ->
     ev' = build_rec_env l env (sev env) -> env' = {| sev := ev'; sec := sec env |} -> funcAppR [clos; v] env' e.
 
 Inductive lappR : lop -> val -> exp -> exp_or_val -> Prop :=

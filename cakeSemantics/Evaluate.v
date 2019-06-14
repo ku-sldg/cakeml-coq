@@ -40,7 +40,7 @@ Fixpoint evaluate {ffi' : Type} (st : state ffi') (env : sem_env v)
           (pes : list (pat * exp)) (err_v : v) : state ffi' * result (list v) v :=
       match pes with
       | [] => (st, Rerr (Rraise err_v))
-      | (p,e)::pes' => if allDistinct String.string_dec (pat_bindings p [])
+      | (p,e)::pes' => if LibList.noduplicates (pat_bindings p [])
                      then match pmatch (sec _ env) (refs _ st) p v' [] with
                           | Match env_v' => evaluate st {| sev := nsAppend (alist_to_ns env_v') (sev _ env);
                                                           sec := (sec _ env) |} [e]
@@ -127,7 +127,7 @@ Fixpoint evaluate {ffi' : Type} (st : state ffi') (env : sem_env v)
                         | res => res
                         end
 
-      | ELetrec funs e => if allDistinct String.string_dec (map (fun trip => match trip with (x, y, z) => x end) funs)
+      | ELetrec funs e => if LibList.noduplicates (map (fun trip => match trip with (x, y, z) => x end) funs)
                          then evaluate st {| sev := build_rec_env funs env (sev _ env); sec := (sec _ env) |} [e]
                          else (st, Rerr (Rabort Rtype_error))
 

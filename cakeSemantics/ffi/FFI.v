@@ -1,3 +1,8 @@
+(* From TLC Require Import LibList. 
+Require Import String.
+Require Import CakeSem.Word.
+Require Import CakeSem.Utils.
+*)
 Require Import Coq.Lists.List.
 Import ListNotations.
 Require Import String.
@@ -5,6 +10,7 @@ Require Import Arith.Peano_dec.
 Require Import Bool.Sumbool.
 Require Import CakeSem.Word.
 Require Import CakeSem.Utils.
+
 
 Inductive ffi_outcome : Set := Ffi_failed | Ffi_diverged.
 
@@ -25,7 +31,7 @@ Inductive final_event : Set :=
 Definition ffi_state (ffi' : Type) := (((oracle ffi') * ffi') * (list io_event))%type.
 
 Definition initial_ffi_state {ffi' : Type} (oc : oracle ffi') (ffi : ffi') : ffi_state ffi' :=
-  (oc, ffi, []).
+  (oc, ffi, nil).
 
 Inductive ffi_result (ffi' : Type) : Type :=
 | Ffi_return : ffi_state ffi' -> list word8 -> ffi_result ffi'

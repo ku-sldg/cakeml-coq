@@ -1,10 +1,5 @@
-Require Import CakeSem.CakeAST.
-Require Import CakeSem.Namespace.
-Require Import CakeSem.ffi.FFI.
-Require Import CakeSem.Word.
-Require Import CakeSem.Utils.
 
-Import Arith.
+Require Import Arith.
 Require Import Ascii.
 Import Bool.Sumbool.
 Require Import List.
@@ -15,6 +10,12 @@ Require PeanoNat.
 Definition eqb := PeanoNat.Nat.eqb.
 (* Require Import Strings.Ascii. *)
 Require Import ZArith.
+
+Require Import CakeSem.ffi.FFI.
+Require Import CakeSem.Word.
+Require Import CakeSem.Utils.
+Require Import CakeSem.Namespace.
+Require Import CakeSem.CakeAST.
 
 Open Scope string_scope.
 
@@ -194,8 +195,8 @@ Definition chr_exn_v  := Conv (Some chr_stamp) [].
 Definition div_exn_v  := Conv (Some div_stamp) [].
 Definition sub_exn_v  := Conv (Some subscript_stamp) [].
 
-Definition bool_type_num := 0.
-Definition list_type_num := 1.
+Definition bool_type_num := 0%nat.
+Definition list_type_num := 1%nat.
 
 (* Result of evaluation *)
 Inductive abort : Type :=
@@ -281,6 +282,7 @@ Arguments next_type_stamp {A} _.
 Arguments next_exn_stamp {A} _.
 Arguments refs {A} _.
 
+
 (* Other primitives *)
 Definition do_con_check (cenv : env_ctor)
            (n_opt : option (ident modN conN))
@@ -289,7 +291,7 @@ Definition do_con_check (cenv : env_ctor)
   | None => true
   | Some n => match nsLookup n cenv with
              | None => false
-             | Some (l',_) => extract_bool (eq_nat_dec l l')
+             | Some (l',_) => if (eq_nat_dec l l') then true else false
              end
   end.
 
@@ -325,12 +327,13 @@ Arguments Match {A}.
 (* TODO : Prop-ertize it *)
 Definition same_type (s1 s2 : stamp) : bool :=
   match s1, s2 with
-  | TypeStamp _ n1, TypeStamp _ n2 => extract_bool (eq_nat_dec n1 n2)
+  | TypeStamp _ n1, TypeStamp _ n2 => if (eq_nat_dec n1 n2) then true else false
   | ExnStamp _, ExnStamp _ => true
   | _, _ => false
   end.
 
-Definition same_ctor (s1 s2 : stamp) : bool := extract_bool (stamp_eq_dec s1 s2).
+Definition same_ctor (s1 s2 : stamp) : bool := 
+  if (stamp_eq_dec s1 s2) then true else false.
 
 Definition ctor_same_type (c1 c2 : option stamp) : bool :=
   match c1, c2 with
@@ -444,10 +447,9 @@ Fixpoint do_eq (e1 e2 : val) : eq_result :=
   in
   match e1, e2 with
   | Litv l1, Litv l2 => if lit_same_type l1 l2
-                       then Eq_val (extract_bool
-                                      (lit_eq_dec l1 l2))
+                       then Eq_val (if (lit_eq_dec l1 l2)  then true else false)
                        else Eq_type_error
-  | Loc l1, Loc l2 => Eq_val (extract_bool (eq_nat_dec l1 l2))
+  | Loc l1, Loc l2 => Eq_val (if (eq_nat_dec l1 l2) then true else false)
   | Conv cn1 vs1, Conv cn2 vs2 => if sumbool_and _ _ _ _
                                                 (option_eq_dec _ stamp_eq_dec
                                                                cn1 cn2)
@@ -618,6 +620,7 @@ Inductive exp_or_val : Type :=
 Definition store_ffi (ffi' : Type) (V : Type) := (store V * ffi_state ffi')%type.
 
 Open Scope bool_scope.
+Open Scope nat_scope.
 Require ZArith.Zdigits.
 Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
   : option (store_ffi ffi' val * result val val) :=
