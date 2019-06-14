@@ -1,16 +1,7 @@
-(* From TLC Require Import LibList. 
-Require Import String.
-Require Import CakeSem.Word.
-Require Import CakeSem.Utils.
-*)
-Require Import Coq.Lists.List.
-Import ListNotations.
-Require Import String.
-Require Import Arith.Peano_dec.
-Require Import Bool.Sumbool.
-Require Import CakeSem.Word.
+
 Require Import CakeSem.Utils.
 
+Require Import Bool.Sumbool.
 
 Inductive ffi_outcome : Set := Ffi_failed | Ffi_diverged.
 
@@ -76,15 +67,15 @@ Definition traceOracle
            (io_trace : list io_event)
            (conf : list word8)
            (input : list word8) : oracle_result (list io_event) :=
-  match head io_trace with
+  match List.head io_trace with
   | Some (Io_event s' conf' bytes2) => if sumbool_and _ _ _ _
                                            (string_dec s s')
-                                           (list_eq_dec
+                                           (List.list_eq_dec
                                               (word_eq_dec 8)
                                               (map fst bytes2)
                                               input)
                                       then Oracle_return (list io_event)
-                                                         (tail io_trace)
+                                                         (List.tail io_trace)
                                                          (map snd bytes2)
                                       else Oracle_final (list io_event) Ffi_failed
   | _ => Oracle_final (list io_event) Ffi_failed

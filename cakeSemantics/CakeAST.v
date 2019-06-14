@@ -6,7 +6,6 @@ Require Import ZArith.BinInt.
 
 Require Import CakeSem.Namespace.
 Require Import CakeSem.Utils.
-Require Import CakeSem.Word.
 
 Create HintDb DecidableEquality.
 Hint Resolve string_dec : DecidableEquality.
@@ -472,7 +471,7 @@ Definition dec_rec (P : dec -> Set) := dec_rect P.
 Definition dec_ind (P : dec -> Prop) := dec_rect P.
 
 Theorem dec_eq_dec : forall (d0 d1 : dec), {d0 = d1} + {d0 <> d1}.
-Proof. decide equality; auto with DecidableEquality.
+Proof. (*decide equality; auto with DecidableEquality.
        apply list_eq_dec. decide equality; auto with DecidableEquality.
        decide equality; auto with DecidableEquality.
        generalize dependent l0.
@@ -482,7 +481,7 @@ Proof. decide equality; auto with DecidableEquality.
          try (rewrite e, e0; left; reflexivity);
          try (right; intro con; inversion con; auto).
 
-       Restart.
+       Restart.*)
        decide equality; auto with DecidableEquality.
        apply list_eq_dec. decide equality; auto with DecidableEquality.
        decide equality; auto with DecidableEquality.

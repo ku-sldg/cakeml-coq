@@ -1,18 +1,26 @@
+
+From TLC Require Export LibString. (* almost same as [Export String] *)
 From TLC Require Export LibInt. (* exports type [int] *)
 From TLC Require Export LibList.
 
-Require Export TLCbuffer.
-Export LibList_Notation. (* notation [] and [x] *)
+Require Export TLCbuffer. (* For local extensions to TLC *)
 
-Require Ascii.
-Require Import Arith.
-Require Import String.
-Require Import CakeSem.Word.
+Export LibList_Notation. (* Notations [] and [x] and [x;y] *)
+
+Require Ascii. (* To define type [char] *)
+
+Require Export CakeSem.Word.
+
+
+(*****************************************************************************)
 
 (** Comparison for strings -- TODO: will be removed later *)
 
 Require Import Classes.EquivDec.
 Instance string_equiv_dec : EqDec string eq := string_dec.
+
+
+(*****************************************************************************)
 
 (** Abbreviation for types *)
 

@@ -2,17 +2,17 @@
 Require Import Arith.
 Require Import Ascii.
 Import Bool.Sumbool.
+Require Strings.String.
 Require Import List.
 Require Import Lists.ListDec.
 Import ListNotations.
-Require Strings.String.
+
 Require PeanoNat.
 Definition eqb := PeanoNat.Nat.eqb.
 (* Require Import Strings.Ascii. *)
 Require Import ZArith.
 
 Require Import CakeSem.ffi.FFI.
-Require Import CakeSem.Word.
 Require Import CakeSem.Utils.
 Require Import CakeSem.Namespace.
 Require Import CakeSem.CakeAST.
@@ -250,6 +250,8 @@ Definition store (A : Type) := list (store_v A).
 Definition emptyStore (A : Type) : store A := [].
 
 Definition store_lookup {A : Type} (n : nat) (st : store A) := nth_error st n.
+
+Open Scope list_scope.
 
 Definition store_alloc {A : Type} (v : store_v A) (st : store A) : (store A * nat) :=
   (st ++ [v], length st).

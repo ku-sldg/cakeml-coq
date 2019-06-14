@@ -3,7 +3,6 @@ Require Import Arith.Peano_dec.
 Import ListNotations.
 Require Import String.
 Require Import FFI.
-Require Import CakeSem.Word.
 Require Import CakeSem.Utils.
 
 Definition simpleIO := ((list word8) * (list word8)) : Set.

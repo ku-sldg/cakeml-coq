@@ -5,7 +5,6 @@
 (* and that this type checker will analyze the code before it's executed using these semantics *)
 Require Import CakeSem.Namespace.
 Require Import CakeSem.Utils.
-Require Import CakeSem.Word.
 Require Import CakeSem.CakeAST.
 Require Import CakeSem.SemanticPrimitives.
 Require Import CakeSem.ffi.FFI.
