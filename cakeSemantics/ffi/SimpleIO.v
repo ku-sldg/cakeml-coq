@@ -6,7 +6,8 @@ Require Import String.
 Require Import FFI.
 Require Import CakeSem.Utils.
 
-Definition simpleIO := ((list word8) * (list word8)) : Set.
+Definition simpleIO  : Type :=
+  ((list word8) * (list word8)).
 
 Definition isEof
            (st : simpleIO)

@@ -1,3 +1,4 @@
+From TLC Require Import LibLogic LibReflect.
 
 Require Import Arith.
 Require Import Ascii.
@@ -7,10 +8,9 @@ Require Import List.
 Require Import Lists.ListDec.
 Import ListNotations.
 
-Require PeanoNat.
-Definition eqb := PeanoNat.Nat.eqb.
 (* Require Import Strings.Ascii. *)
 Require Import ZArith.
+Require ZArith.Zdigits.
 
 Require Import CakeSem.ffi.FFI.
 Require Import CakeSem.Utils.
@@ -18,36 +18,23 @@ Require Import CakeSem.Namespace.
 Require Import CakeSem.CakeAST.
 
 Open Scope string_scope.
-
+Open Scope list_scope.
 
 
 Inductive stamp : Set :=
-| TypeStamp : conN -> nat -> stamp
-| ExnStamp : nat -> stamp.
-
-Theorem stamp_eq_dec : forall x y : stamp, {x = y} + {x <> y}.
-  repeat decide equality. Qed.
-Hint Resolve stamp_eq_dec : DecidableEquality.
-
+  | TypeStamp : conN -> nat -> stamp
+  | ExnStamp : nat -> stamp.
 
 Record sem_env (V : Type) := {
-                              sev : namespace modN varN V;
-                              sec : namespace modN conN (nat * stamp)
-                              }.
+  sev : namespace modN varN V;
+  sec : namespace modN conN (nat * stamp) }.
 
 Arguments sev {V} _.
 Arguments sec {V} _.
 
-Theorem sem_env_eq_dec : forall (V : Type) (s0 s1 : sem_env V),
-    (forall (v0 v1 : V), {v0 = v1} + {v0 <> v1}) -> {s0 = s1} + {s0 <> s1}.
-Proof.
-  decide equality; apply namespace_eq_dec; try (auto with DecidableEquality).
-  decide equality; auto with DecidableEquality.
-Qed.
-Hint Resolve sem_env_eq_dec : DecidableEquality.
-
 (* Values *)
 Unset Elimination Schemes.
+
 Inductive val : Type :=
 | Litv : lit -> val
 | Conv : option stamp -> list val -> val
@@ -55,6 +42,10 @@ Inductive val : Type :=
 | Recclosure : sem_env val -> list (varN * varN * exp) -> varN -> val
 | Loc : nat -> val
 | Vectorv : list val -> val.
+
+
+(*-------------------------------------------------------------------*)
+(** Begin induction principle *)
 
 Fixpoint val_rect (P : val -> Type)
          (H1 : forall (l : lit), P (Litv l))
@@ -104,83 +95,11 @@ Fixpoint val_rect (P : val -> Type)
 Definition val_ind (P : val -> Prop) := val_rect P.
 Definition val_rec (P : val -> Set) := val_rect P.
 
-Theorem val_eq_dec : forall (v0 v1 : val), {v0 = v1} + {v0 <> v1}.
-Proof.
-  decide equality; auto with DecidableEquality.
 
-  generalize dependent l0.
-  induction X; destruct l0;
-    try (left; reflexivity); try (right; discriminate).
-  destruct (p v); destruct (IHX l0).
-  rewrite e, e0; left; reflexivity.
-  right; intro con; inversion con; auto.
-  right; intro con; inversion con; auto.
-  right; intro con; inversion con; auto.
+(** End induction principle *)
+(*-------------------------------------------------------------------*)
 
-  decide equality; auto with DecidableEquality.
-
-  generalize dependent s0.
-  assert (pair_nat_stamp_dec : forall (p p0: (nat * stamp)), {p = p0} + {p <> p0})
-    by (decide equality; auto with DecidableEquality).
-
-  induction s; destruct s0.
-  destruct (namespace_eq_dec modN conN (nat * stamp) String.string_dec String.string_dec pair_nat_stamp_dec sec0 sec1).
-  rewrite e1.
-  simpl in X.
-  generalize dependent sev1.
-  induction X; destruct sev1;
-    try (left; reflexivity); try (right; discriminate).
-  destruct x; destruct p0.
-  destruct (ident_eq_dec modN varN i i0); try (apply String.string_dec).
-  rewrite e2.
-  destruct (p v3).
-  simpl in e3; rewrite e3.
-  destruct (IHX sev1).
-  inversion e4.
-  left; reflexivity.
-  right; intro con; inversion con. apply n0. rewrite H0. reflexivity.
-  right; intro con; inversion con; auto.
-  right; intro con; inversion con; auto.
-  right; intro con; inversion con; auto.
-
-  apply list_eq_dec.
-  decide equality; try (apply exp_eq_dec).
-  decide equality; try (apply String.string_dec).
-
-  generalize dependent s0.
-  assert (pair_nat_stamp_dec : forall (p p0: (nat * stamp)), {p = p0} + {p <> p0})
-    by (decide equality; auto with DecidableEquality).
-
-  induction s; destruct s0.
-  destruct (namespace_eq_dec modN conN (nat * stamp) String.string_dec String.string_dec pair_nat_stamp_dec sec0 sec1).
-  rewrite e.
-  simpl in X.
-  generalize dependent sev1.
-  induction X; destruct sev1;
-    try (left; reflexivity); try (right; discriminate).
-  destruct x; destruct p0.
-  destruct (ident_eq_dec modN varN i i0); try (apply String.string_dec).
-  rewrite e0.
-  destruct (p v3).
-  simpl in e1; rewrite e1.
-  destruct (IHX sev1).
-  inversion e2.
-  left; reflexivity.
-  right; intro con; inversion con. apply n0. rewrite H0. reflexivity.
-  right; intro con; inversion con; auto.
-  right; intro con; inversion con; auto.
-  right; intro con; inversion con; auto.
-
-  generalize dependent l0.
-  induction X; destruct l0;
-    try (left; reflexivity); try (right; discriminate).
-  destruct (IHX l0); destruct (p v).
-  rewrite e, e0. left; reflexivity.
-  right; intro con; inversion con; auto.
-  right; intro con; inversion con; auto.
-  right; intro con; inversion con; auto.
-Qed.
-Hint Resolve val_eq_dec : DecidableEquality.
+(* LATER : add type annotations? *)
 
 Definition env_ctor := namespace modN conN (nat * stamp).
 Definition env_val := namespace modN varN val.
@@ -199,21 +118,22 @@ Definition bool_type_num := 0%nat.
 Definition list_type_num := 1%nat.
 
 (* Result of evaluation *)
+
 Inductive abort : Type :=
-| Rtype_error : abort
-| Rtimeout_error : abort
-| Rffi_error : final_event -> abort.
+  | Rtype_error : abort
+  | Rtimeout_error : abort
+  | Rffi_error : final_event -> abort.
 
 Inductive error_result (A : Type) : Type :=
-| Rraise : A -> error_result A
-| Rabort : abort -> error_result A.
+  | Rraise : A -> error_result A
+  | Rabort : abort -> error_result A.
 
 Arguments Rraise {A}.
 Arguments Rabort {A}.
 
 Inductive result (A : Type) (B : Type) : Type :=
-| Rval : A -> result A B
-| Rerr : error_result B -> result A B.
+  | Rval : A -> result A B
+  | Rerr : error_result B -> result A B.
 
 (* Inductive result (A B : Type) : Type := *)
 (* | Rval : A -> result A B *)
@@ -225,12 +145,12 @@ Arguments Rerr {A} {B}.
 
 (* Stores *)
 Inductive store_v (A : Type) : Type :=
-(* Reference *)
-| Refv : A -> store_v A
-(* Byte array *)
-| W8array : list word8 -> store_v A
-(* Value array *)
-| Varray : list A -> store_v A.
+  (* Reference *)
+  | Refv : A -> store_v A
+  (* Byte array *)
+  | W8array : list word8 -> store_v A
+  (* Value array *)
+  | Varray : list A -> store_v A.
 
 Arguments Refv {A}.
 Arguments W8array {A}.
@@ -250,8 +170,6 @@ Definition store (A : Type) := list (store_v A).
 Definition emptyStore (A : Type) : store A := [].
 
 Definition store_lookup {A : Type} (n : nat) (st : store A) := nth_error st n.
-
-Open Scope list_scope.
 
 Definition store_alloc {A : Type} (v : store_v A) (st : store A) : (store A * nat) :=
   (st ++ [v], length st).
@@ -335,7 +253,7 @@ Definition same_type (s1 s2 : stamp) : bool :=
   end.
 
 Definition same_ctor (s1 s2 : stamp) : bool := 
-  if (stamp_eq_dec s1 s2) then true else false.
+  If s1 = s2 then true else false.
 
 Definition ctor_same_type (c1 c2 : option stamp) : bool :=
   match c1, c2 with
@@ -375,17 +293,17 @@ Fixpoint pmatch (envC : env_ctor) (s : store val) (p : pat) (v : val)
   match p, v with
   | Pany, v' => Match env
   | Pvar x, v' => Match ((x,v')::env)
-  | Plit l, Litv l' => if lit_eq_dec l l'
+  | Plit l, Litv l' => If l = l'
                       then Match env
                       else if lit_same_type l l'
                            then No_match
                            else Match_type_error
   | Pcon (Some n) ps, Conv (Some stamp') vs =>
     match  nsLookup n envC with
-    | Some (l, stamp) => if andb (same_type stamp stamp')
-                                (eqb (length ps) l)
+    | Some (l, stamp) => If   istrue (same_type stamp stamp') (* LATER: same_type could be in Prop? *)
+                           /\ (length ps = l)
                         then if same_ctor stamp stamp'
-                             then if (eqb (length ps) l)
+                             then If (length ps = l) (* TODO: suspicious redundant test *)
                                   then pmatch_list envC s ps vs env
                                   else Match_type_error
                              else No_match
@@ -426,14 +344,10 @@ Fixpoint find_recfun {A B : Type} (n : varN) (funs : list (varN * A * B))
   end.
 
 Inductive eq_result : Type :=
-| Eq_val : bool -> eq_result
-| Eq_type_error.
+  | Eq_val : bool -> eq_result
+  | Eq_type_error.
 
-Theorem option_eq_dec : forall (A : Type) (A_dec : forall (a b : A), {a = b} + {a <> b})
-                          (x y : option A), {x = y} + {x <> y}.
-Proof. decide equality. Qed.
-
-(* Here we can probably start Prop-ertizing *)
+(* Here we can probably start Prop-ertizing *) (* LATER: ask about it *)
 Fixpoint do_eq (e1 e2 : val) : eq_result :=
   let fix do_eq_list (el1 el2 : list val) : eq_result :=
       match el1, el2 with
@@ -449,19 +363,15 @@ Fixpoint do_eq (e1 e2 : val) : eq_result :=
   in
   match e1, e2 with
   | Litv l1, Litv l2 => if lit_same_type l1 l2
-                       then Eq_val (if (lit_eq_dec l1 l2)  then true else false)
+                       then Eq_val (If (l1 = l2) then true else false)
                        else Eq_type_error
-  | Loc l1, Loc l2 => Eq_val (if (eq_nat_dec l1 l2) then true else false)
-  | Conv cn1 vs1, Conv cn2 vs2 => if sumbool_and _ _ _ _
-                                                (option_eq_dec _ stamp_eq_dec
-                                                               cn1 cn2)
-                                                (eq_nat_dec (length vs1)
-                                                            (length vs2))
+  | Loc l1, Loc l2 => Eq_val (If (l1 = l2) then true else false)
+  | Conv cn1 vs1, Conv cn2 vs2 => If cn1 = cn2 /\ length vs1 = length vs2
                                  then do_eq_list vs1 vs2
                                  else if ctor_same_type cn1 cn2
                                       then Eq_val false
                                       else Eq_type_error
-  | Vectorv vs1, Vectorv vs2 => if eq_nat_dec (length vs1) (length vs2)
+  | Vectorv vs1, Vectorv vs2 => If (length vs1 = length vs2)
                                then do_eq_list vs1 vs2
                                else Eq_val false
   | Closure _ _ _, Closure _ _ _ => Eq_val true
@@ -492,11 +402,10 @@ Fixpoint do_opapp (vs : list val) : option (sem_env val * exp) :=
 
 Fixpoint val_to_list (v : val) : option (list val) :=
   match v with
-  | Conv (Some stamp) [] => if stamp_eq_dec stamp (TypeStamp "[]" list_type_num)
+  | Conv (Some stamp) [] => If (stamp = TypeStamp "[]" list_type_num)
                            then Some []
                            else None
-  | Conv (Some stamp) [v1;v2] => if stamp_eq_dec stamp
-                                                (TypeStamp "::" list_type_num)
+  | Conv (Some stamp) [v1;v2] => If (stamp = TypeStamp "::" list_type_num)
                                 then match val_to_list v2 with
                                      | Some vs => Some (v1::vs)
                                      | None => None
@@ -513,11 +422,11 @@ Fixpoint list_to_val (vs : list val) : val :=
 
 Fixpoint val_to_char_list (v : val) : option (list char) :=
   match v with
-  | Conv (Some stamp) [] => if stamp_eq_dec stamp (TypeStamp "[]" list_type_num)
+  | Conv (Some stamp) [] => If (stamp = TypeStamp "[]" list_type_num)
                            then Some []
                            else None
   | Conv (Some stamp) [Litv (CharLit c); v'] =>
-    if stamp_eq_dec stamp (TypeStamp "::" list_type_num)
+    If (stamp = TypeStamp "::" list_type_num)
     then match val_to_char_list v' with
          | Some cs => Some (c::cs)
          | None => None
@@ -538,24 +447,25 @@ Fixpoint vals_to_string (vs : list val) : option String.string :=
 
 Open Scope bool_scope.
 Open Scope Z_scope.
+
 Fixpoint copy_array {A : Type} (p : list A * Z) (len : Z)
          (op : option (list A * Z)) : option (list A) :=
-  match p with (src,srcoff) =>
-               if (srcoff <? 0) || (len <? 0) || (Zlength src <? srcoff + len)
+  let '(src,srcoff) := p in
+  If (srcoff < 0) \/ (len < 0) \/ (Zlength src < srcoff + len)
+    then None
+     else let copied := List.firstn (Z.to_nat len)
+                         (List.skipn (Z.to_nat srcoff) src) in
+           match op with
+           | Some (dst,dstoff) =>
+             If (dstoff < 0) \/ (Zlength dst < dstoff + len)
                then None
-               else let copied := List.firstn (Z.to_nat len)
-                                              (List.skipn (Z.to_nat srcoff) src)
-                    in match op with
-                       | Some (dst,dstoff) =>
-                         if (dstoff <? 0) || (Zlength dst <? dstoff + len)
-                         then None
-                         else Some (List.firstn
-                                      (Z.to_nat dstoff)
-                                      dst ++ copied ++
-                                      List.skipn (Z.to_nat (dstoff + len)) dst)
-                       | None => Some copied
-                       end
-  end.
+               else Some (List.firstn
+                            (Z.to_nat dstoff)
+                            dst ++ copied ++
+                            List.skipn (Z.to_nat (dstoff + len)) dst)
+           | None => Some copied
+   end.
+
 Close Scope bool_scope.
 Close Scope Z_scope.
 
@@ -612,20 +522,21 @@ Definition shift64_lookup (op : CakeAST.shift) : word64 -> nat -> word64 :=
 
 Definition Boolv (b : bool) : val :=
   if b
-  then Conv (Some (TypeStamp "True"  bool_type_num)) []
-  else Conv (Some (TypeStamp "False" bool_type_num)) [].
+    then Conv (Some (TypeStamp "True"  bool_type_num)) []
+    else Conv (Some (TypeStamp "False" bool_type_num)) [].
 
 Inductive exp_or_val : Type :=
-| Exp : exp -> exp_or_val
-| Val : val -> exp_or_val.
+  | Exp : exp -> exp_or_val
+  | Val : val -> exp_or_val.
 
 Definition store_ffi (ffi' : Type) (V : Type) := (store V * ffi_state ffi')%type.
 
 Open Scope bool_scope.
 Open Scope nat_scope.
-Require ZArith.Zdigits.
+
 Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
   : option (store_ffi ffi' val * result val val) :=
+  (* LATER: take out as separate functions the next three defs *)
   let natFromInteger  :=
       (fun n : nat => let fix helper (n' : nat ) (z : Z) : nat :=
                      match n' with
@@ -649,13 +560,9 @@ Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
       | _, _ => None
       end
     | Opn o', [Litv (IntLit n1); Litv (IntLit n2)] =>
-      if sumbool_and _ _ _ _
-                     (Z.eq_dec n2 0)
-                     (sumbool_or _ _ _ _
-                                 (opn_eq_dec o' Divide)
-                                 (opn_eq_dec o' Modulo))
-      then Some ((s,t), Rerr (Rraise div_exn_v))
-      else Some ((s,t), Rval (Litv (IntLit (opn_lookup o' n1 n2))))
+      If n2 = 0 /\ (o' = Divide \/ o' = Modulo)
+        then Some ((s,t), Rerr (Rraise div_exn_v))
+        else Some ((s,t), Rval (Litv (IntLit (opn_lookup o' n1 n2))))
     | Opb o', [Litv (IntLit n1); Litv (IntLit n2)] =>
       Some ((s,t), Rval (Boolv (opb_lookup o' n1 n2)))
     | Opw W8 o', [Litv (Word8Lit w1); Litv (Word8Lit w2)] =>
@@ -691,7 +598,7 @@ Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
       | _ => None
       end
     | Aw8alloc, [Litv (IntLit n); Litv (Word8Lit w)] =>
-      if (n <? 0)%Z then
+      If (n < 0)%Z then
         Some ((s,t), Rerr (Rraise sub_exn_v))
       else
         let (s',lnum) := store_alloc (W8array (List.repeat w (Z.to_nat n))) s
@@ -699,7 +606,7 @@ Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
     | Aw8sub, [Loc lnum; Litv (IntLit i)] =>
       match store_lookup lnum s with
       | Some (W8array ws) =>
-        if (i <? 0)%Z
+        If (i < 0)%Z
         then Some ((s,t), Rerr (Rraise sub_exn_v))
         else
           let n := Z.to_nat i in
@@ -717,7 +624,7 @@ Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
     | Aw8update, [Loc lnum; Litv (IntLit i); Litv (Word8Lit w)] =>
       match store_lookup lnum s with
       | Some (W8array ws) =>
-        if (i <? 0)%Z then
+        If (i < 0)%Z then
           Some ((s,t), Rerr (Rraise sub_exn_v))
         else
           let n := Z.to_nat i in
@@ -787,7 +694,7 @@ Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
     | Ord, [Litv (CharLit c)] =>
       Some ((s,t), Rval (Litv (IntLit (Z.of_nat (nat_of_ascii c)))))
     | Chr, [Litv (IntLit i)] =>
-      Some ((s,t), if (i <? 0)%Z || (i >? 255)%Z
+      Some ((s,t), If (i < 0)%Z \/ (i > 255)%Z
                    then Rerr (Rraise chr_exn_v)
                    else Rval (Litv (CharLit (ascii_of_nat (Z.to_nat i)))))
     | Chopb op, [Litv (CharLit c1); Litv (CharLit c2)] =>
@@ -799,7 +706,7 @@ Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
       | None => None
       end
     | Strsub, [Litv (StrLit str); Litv (IntLit i)] =>
-      if (i <? 0)%Z then
+      If (i < 0)%Z then
         Some ((s,t), Rerr (Rraise sub_exn_v))
       else
         let n := Z.to_nat i in
@@ -825,7 +732,7 @@ Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
       | None    => None
       end
     | VSub, [Vectorv vs; Litv (IntLit i)] =>
-      if (i <? 0)%Z
+      If (i < 0)%Z
       then Some ((s,t), Rerr (Rraise sub_exn_v))
       else
         let n := Z.to_nat i in
@@ -836,7 +743,7 @@ Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
     | Vlength, [Vectorv vs] =>
       Some ((s,t), Rval (Litv (IntLit (Z.of_nat (List.length  vs)))))
     | Aalloc, [Litv (IntLit n); v] =>
-      if (n <? 0)%Z
+      If (n < 0)%Z
       then Some ((s,t), Rerr (Rraise sub_exn_v))
       else
         let (s',lnum) := store_alloc (Varray (List.repeat v (Z.to_nat n))) s
@@ -847,7 +754,7 @@ Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
     | Asub, [Loc lnum; Litv (IntLit i)] =>
       match store_lookup lnum s with
       | Some (Varray vs) =>
-        if (i <? 0)%Z then
+        If (i < 0)%Z then
           Some ((s,t), Rerr (Rraise sub_exn_v))
         else
           let n := Z.to_nat i in
@@ -866,7 +773,7 @@ Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
     | Aupdate, [Loc lnum; Litv (IntLit i); v] =>
       match store_lookup lnum s with
       | Some (Varray vs') =>
-        if (i <? 0)%Z then
+        If (i < 0)%Z then (* LATER: use a wrapper function for this kind of test *)
           Some ((s,t), Rerr (Rraise sub_exn_v))
         else
           let n := Z.to_nat i in
@@ -901,25 +808,25 @@ Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
   end.
 
 Definition do_log (op : lop) (v : val) (e : exp) : option exp_or_val :=
-  match op  with
-  | And => if val_eq_dec (Boolv true) v
+  match op with (* LATER: would be more idiomatic to write "If v = Boolv true" *)
+  | And => If (Boolv true) = v
           then Some (Exp e)
-          else if val_eq_dec (Boolv false) v
+          else If (Boolv false) = v
                then Some (Val v)
                else None
-  | Or =>  if val_eq_dec (Boolv true) v
+  | Or => If (Boolv true) = v
           then Some (Val v)
-          else if val_eq_dec (Boolv false) v
+          else If (Boolv false) = v
                then Some (Exp e)
                else None
   end.
 
 Definition do_if (v : val) (e1 e2 : exp) : option exp :=
-  if val_eq_dec (Boolv true) v
-  then Some e1
-  else if val_eq_dec (Boolv false) v
-       then Some e2
-       else None.
+  If Boolv true = v
+    then Some e1
+    else If Boolv false = v
+         then Some e2
+         else None.
 
 (* Semantic helpers *)
 
@@ -938,4 +845,5 @@ Fixpoint build_tdefs (n : nat) (tds : list (list tvarN * typeN * list (conN * li
   end.
 
 Definition extend_dec_env (env env' : sem_env val) : sem_env val :=
-  {| sev := nsAppend (sev env) (sev env'); sec := nsAppend (sec env) (sec env')|}.
+  {| sev := nsAppend (sev env) (sev env'); 
+     sec := nsAppend (sec env) (sec env')|}.
