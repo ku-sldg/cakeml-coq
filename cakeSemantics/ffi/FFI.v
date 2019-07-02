@@ -1,3 +1,5 @@
+From TLC Require Import LibLogic LibString.
+Open Scope string_scope.
 
 Require Import CakeSem.Utils.
 
@@ -39,49 +41,39 @@ Definition call_FFI {ffi' : Type} (st : ffi_state ffi')
            (str : string)
            (conf : list word8)
            (bytes : list word8) : ffi_result :=
-  if sumbool_not _ _ (string_dec str "")
-  then match st with (orac, x, iol) =>
-                     match orac str x conf bytes with
-                     | Oracle_return _ ffi bytes' =>
-                       if Nat.eqb (List.length bytes') (List.length bytes)
-                       then (Ffi_return ffi' (orac, ffi,
-                                        iol ++ [Io_event str conf (combine bytes bytes')])
-                                       bytes'
-                            )
-                       else (Ffi_final ffi' (Final_event str conf bytes Ffi_failed))
-
-                     | Oracle_final _ outcome => Ffi_final ffi' (Final_event str conf bytes outcome)
-                     end
+  If str <> ""
+  then let '(orac, x, iol) := st in
+       match orac str x conf bytes with
+       | Oracle_return _ ffi bytes' =>
+         If List.length bytes' = List.length bytes
+         then (let iol' := iol ++ [Io_event str conf (combine bytes bytes')] in
+               Ffi_return ffi' (orac, ffi, iol') bytes')
+         else (Ffi_final ffi' (Final_event str conf bytes Ffi_failed))
+       | Oracle_final _ outcome => Ffi_final ffi' (Final_event str conf bytes outcome)
        end
   else Ffi_return ffi' st bytes.
 
 Inductive outcome : Set :=
-| Success : outcome
-| Resource_limit_hit : outcome
-| Ffi_outcome : final_event  -> outcome.
+  | Success : outcome
+  | Resource_limit_hit : outcome
+  | Ffi_outcome : final_event  -> outcome.
 
 (* In diverge, the list needs to be lazy because the ioEvents can be infinite *)
 Inductive behavior (ffi' : Type) :=
-| Diverge : list io_event -> behavior ffi'
-| Terminate : outcome -> list io_event -> behavior ffi'
-| Fail.
+  | Diverge : list io_event -> behavior ffi'
+  | Terminate : outcome -> list io_event -> behavior ffi'
+  | Fail.
 
-(* fromJust is a problem *)
+(* fromJust is a problem -- TODO discuss *)
 Definition traceOracle
            (s : string)
            (io_trace : list io_event)
            (conf : list word8)
            (input : list word8) : oracle_result (list io_event) :=
   match List.head io_trace with
-  | Some (Io_event s' conf' bytes2) => if sumbool_and _ _ _ _
-                                           (string_dec s s')
-                                           (List.list_eq_dec
-                                              (word_eq_dec 8)
-                                              (map fst bytes2)
-                                              input)
-                                      then Oracle_return (list io_event)
-                                                         (List.tail io_trace)
-                                                         (map snd bytes2)
-                                      else Oracle_final (list io_event) Ffi_failed
+  | Some (Io_event s' conf' bytes2) => 
+      If s = s' /\ map fst bytes2 = input
+         then Oracle_return (list io_event) (List.tail io_trace) (map snd bytes2)
+         else Oracle_final (list io_event) Ffi_failed
   | _ => Oracle_final (list io_event) Ffi_failed
   end.

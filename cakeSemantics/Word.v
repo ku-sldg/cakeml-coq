@@ -205,3 +205,4 @@ Definition word_to_nat (s : nat) (w : word s) : nat :=
 
 Definition nat_to_word (s n : nat) : word s :=
   Word s (n mod 2 ^ s) (Oneq s n).
+
