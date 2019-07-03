@@ -110,7 +110,7 @@ Inductive pmatchR : store val -> sem_env val -> pat -> val -> match_result (sem_
       pmatchlistR sto env ps vs (Match env') -> 
       pmatchR sto env (Pcon (Some n) ps) (Conv (Some s') vs) (Match env')
 
-  | nomatch_Pcon : forall (sto : store val) (env env': sem_env val) (n : ident modN conN) (on : option (ident modN conN)) (c : conN) (l : nat) (s s' : stamp) (os : option stamp) (ps : list pat) (vs : list val),
+  | nomatch_Pcon : forall (sto : store val) (env env': sem_env val) (n : ident modN conN) (on : constr_id) (c : conN) (l : nat) (s s' : stamp) (os : option stamp) (ps : list pat) (vs : list val),
     (* 0. one name exists and the other does not *)
     (on = Some n /\ os = None) \/ (on = None /\ os = Some s') \/
     (* 1. constructor stamp is not in env *) (* Should be caught during type checking *)
@@ -158,7 +158,7 @@ with pmatchlistR : store val -> sem_env val -> list pat -> list val -> match_res
 
   (* might be too many helper functions here: do_con_check is hiding alot and rev is usually a pain when trying to use abstractly *)
   (* do_con_check might be an unnecessary step because type checking ensures constructors are applied to correct number/type of arguments *)
-  | EConNamed_R : forall (st' : state A) (es : list exp) (vs : list val) (o : option (ident modN conN)) (i : ident modN conN) (n : nat) (s : stamp),
+  | EConNamed_R : forall (st' : state A) (es : list exp) (vs : list val) (o : constr_id) (i : ident modN conN) (n : nat) (s : stamp),
       do_con_check (sec env) o n = true ->
       argR A st env es (st', Rval vs) -> 
       expR A st env (ECon o es) (st', Rval (Conv (Some s) vs))
@@ -207,7 +207,10 @@ with pmatchlistR : store val -> sem_env val -> list pat -> list val -> match_res
       expR A st env (ELog op e1 e2) (st'', Rval v)
 
   | EIfTrue_R  : forall (st' st'' : state A) (c t e : exp) (v : result val val),
-      expR A st env c (st', Rval trueConv) -> expR A st' env t (st'',v) -> expR A st env (EIf c t e) (st'',v)
+      expR A st env c (st', Rval trueConv) -> 
+      expR A st' env t (st'',v) -> 
+      expR A st env (EIf c t e) (st'',v)
+
   | EIfFalse_R : forall (st' st'' : state A) (c t e : exp) (v : result val val),
       expR A st env c (st', Rval falseConv) -> 
       expR A st' env e (st'', v) -> 

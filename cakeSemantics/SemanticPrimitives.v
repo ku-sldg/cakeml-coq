@@ -205,7 +205,7 @@ Arguments refs {A} _.
 
 (* Other primitives *)
 Definition do_con_check (cenv : env_ctor)
-           (n_opt : option (ident modN conN))
+           (n_opt : constr_id)
            (l : nat) : bool :=
   match n_opt with
   | None => true
@@ -215,7 +215,7 @@ Definition do_con_check (cenv : env_ctor)
              end
   end.
 
-Definition build_conv (envC : env_ctor) (cn : option (ident modN conN))
+Definition build_conv (envC : env_ctor) (cn : constr_id)
            (vs : list val) : option val :=
   match cn with
   | None => Some (Conv None vs)

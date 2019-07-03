@@ -120,6 +120,10 @@ Unset Elimination Schemes.
 
 (* Types *)
 
+(** BACKPORT this definition to Cakeml Lem semantics *)
+Definition constr_id : Type := 
+  option (ident modN conN).
+
 Inductive ast_t : Type :=
   | Atvar : tvarN -> ast_t
   | Atfun : ast_t -> ast_t -> ast_t
@@ -130,7 +134,7 @@ Inductive pat : Type :=
   | Pany : pat
   | Pvar : varN -> pat
   | Plit : lit -> pat
-  | Pcon : option (ident modN conN) -> list pat -> pat
+  | Pcon : constr_id -> list pat -> pat
   | Pref : pat -> pat
   | Ptannot : pat -> ast_t -> pat.
 
@@ -142,7 +146,7 @@ Inductive exp : Type :=
   | ERaise : exp -> exp
   | EHandle : exp -> list (pat * exp) -> exp
   | ELit : lit -> exp
-  | ECon : option (ident modN conN) -> list exp -> exp
+  | ECon : constr_id -> list exp -> exp
   | EVar : ident modN varN -> exp
   | EFun : varN -> exp -> exp
   | EApp : op -> list exp -> exp
@@ -167,6 +171,9 @@ Inductive dec : Type :=
   | Dmod : modN -> list dec -> dec
   | Dlocal : list dec -> list dec -> dec.
 
+
+(** BACKPORT the new definition without accumulator
+
 Fixpoint pat_bindings (p : pat) (already_bound : list varN) : list varN :=
   let fix pats_bindings (ps : list pat) (already_bound : list varN) : list varN :=
       match ps with
@@ -183,6 +190,17 @@ Fixpoint pat_bindings (p : pat) (already_bound : list varN) : list varN :=
   | Ptannot p _ => pat_bindings p already_bound
   end.
 
+*)
+
+Fixpoint pat_bindings (p : pat) : list varN :=
+  match p with
+  | Pany => []
+  | Pvar n => n :: []
+  | Plit l => []
+  | Pcon _ ps => List.fold_right (fun p acc => acc ++ pat_bindings p) [] ps
+  | Pref p => pat_bindings p
+  | Ptannot p _ => pat_bindings p
+  end.
 
 
 (*-------------------------------------------------------------------*)
@@ -225,7 +243,7 @@ Fixpoint pat_rect (P : pat -> Type)
          (H1 : P Pany)
          (H2 : forall (v : varN), P (Pvar v))
          (H3 : forall (l : lit), P (Plit l))
-         (H4 : forall (o : option (ident modN conN)) (l : list pat), Forall'' pat P l -> P (Pcon o l))
+         (H4 : forall (o : constr_id) (l : list pat), Forall'' pat P l -> P (Pcon o l))
          (H5 : forall (p : pat), P p -> P (Pref p))
          (H6 : forall (p : pat), P p -> forall (a : ast_t), P (Ptannot p a))
          (p : pat) : P p :=
@@ -267,7 +285,7 @@ Fixpoint exp_rect (P : exp -> Type)
          (H2 : forall (e : exp), P e -> forall (l : list (pat * exp)), Forall'' (pat * exp) (exp_rect_helper P) l
                                                             -> P (EHandle e l))
          (H3 : forall (l : lit), P (ELit l))
-         (H4 : forall (o : option (ident modN conN)) (l : list exp), Forall'' exp P l
+         (H4 : forall (o : constr_id) (l : list exp), Forall'' exp P l
                                                                 -> P (ECon o l))
          (H5 : forall (i : ident modN varN), P (EVar i))
          (H6 : forall (v : varN) (e : exp), P e -> P (EFun v e))

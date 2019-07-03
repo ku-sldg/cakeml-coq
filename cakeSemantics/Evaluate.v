@@ -45,7 +45,7 @@ Fixpoint evaluate {ffi' : Type} (st : state ffi') (env : sem_env v)
           (pes : list (pat * exp)) (err_v : v) : state ffi' * result (list v) v :=
       match pes with
       | [] => (st, Rerr (Rraise err_v))
-      | (p,e)::pes' => If LibList.noduplicates (pat_bindings p [])
+      | (p,e)::pes' => If LibList.noduplicates (pat_bindings p)
                      then match pmatch (sec env) (refs st) p v' [] with
                           | Match env_v' => evaluate st {| sev := nsAppend (alist_to_ns env_v') (sev env);
                                                           sec := (sec env) |} [e]
