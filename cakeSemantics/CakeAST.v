@@ -39,7 +39,7 @@ Inductive shift : Type :=
   | Lsl : shift
   | Lsr : shift
   | Asr : shift
-  | Ror : shift.
+  | Ror : shift.    
 
 Definition modN := string.
 

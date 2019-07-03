@@ -12,7 +12,7 @@ Import ListNotations.
 Definition fix_clock {ffi' : Type} {res error : Type} (s : state ffi')
            (p : state ffi' * result res error) : state ffi' * result res error :=
   match p with (s', r) =>
-               ({| clock := If clock s' <= clock s
+               ({| clock  := If clock s' <= clock s
                            then clock s' else clock s;
                    refs := refs s';
                    ffi := ffi s';
