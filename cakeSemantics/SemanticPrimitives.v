@@ -1,3 +1,4 @@
+Set Implicit Arguments.
 From TLC Require Import LibLogic LibReflect.
 
 Require Import Arith.
@@ -25,12 +26,21 @@ Inductive stamp : Set :=
   | TypeStamp : conN -> nat -> stamp
   | ExnStamp : nat -> stamp.
 
+(* BACKPORT: use of this abbreviations in the definition of sem_env *)
+Definition env_ctor := namespace modN conN (nat * stamp).
+
 Record sem_env (V : Type) := {
   sev : namespace modN varN V;
-  sec : namespace modN conN (nat * stamp) }.
+  sec : env_ctor }.
 
 Arguments sev {V} _.
 Arguments sec {V} _.
+
+Definition update_sev V (e:sem_env V) (x:namespace modN varN V) :=
+  {| sev := x; sec := sec e |}.
+
+Definition update_sec V (e:sem_env V) x :=
+  {| sev := sev e; sec := x |}.
 
 (* Values *)
 Unset Elimination Schemes.
@@ -56,7 +66,7 @@ Fixpoint val_rect (P : val -> Type)
          (H5 : forall (n : nat), P (Loc n))
          (H6 : forall (l : list val), Forall'' val P l -> P (Vectorv l))
          (v : val) : P v :=
-  let val_rect' := val_rect P H1 H2 H3 H4 H5 H6 in
+  let val_rect' := @val_rect P H1 H2 H3 H4 H5 H6 in
   match v with
   | Litv l => H1 l
   | Conv o l => let fix loop (l : list val) :=
@@ -92,22 +102,22 @@ Fixpoint val_rect (P : val -> Type)
                 H6 l (loop l)
   end.
 
-Definition val_ind (P : val -> Prop) := val_rect P.
-Definition val_rec (P : val -> Set) := val_rect P.
+Definition val_ind (P : val -> Prop) := @val_rect P.
+Definition val_rec (P : val -> Set) := @val_rect P.
 
 
 (** End induction principle *)
 (*-------------------------------------------------------------------*)
 
 (* LATER : add type annotations? *)
-
-Definition env_ctor := namespace modN conN (nat * stamp).
 Definition env_val := namespace modN varN val.
 
 Definition bind_stamp := ExnStamp 0.
 Definition chr_stamp := ExnStamp 1.
 Definition div_stamp := ExnStamp 2.
 Definition subscript_stamp := ExnStamp 3.
+
+(* BACKPORT: bind_exn_v is used to mean "match failure", but that's not an intuitive name for it *)
 
 Definition bind_exn_v := Conv (Some bind_stamp) [].
 Definition chr_exn_v  := Conv (Some chr_stamp) [].
@@ -118,6 +128,8 @@ Definition bool_type_num := 0%nat.
 Definition list_type_num := 1%nat.
 
 (* Result of evaluation *)
+(* BACKPORT: this section should not be in a filed called SemanticPrimitives
+    but instead in a file called SemanticsStruct or SemanticsResults *)
 
 Inductive abort : Type :=
   | Rtype_error : abort
@@ -180,7 +192,7 @@ Definition update {A : Type} (n : nat) (v : A)  (st : list A) : list A :=
 Fixpoint store_assign {A : Type} (n : nat) (v : store_v A) (st : store A)
   : option (store A) :=
   match nth_error st n with
-  | Some v' => if store_v_same_type A v' v
+  | Some v' => if store_v_same_type v' v
               then Some (update n v st)
               else None
   | _ => None
@@ -202,16 +214,22 @@ Arguments next_type_stamp {A} _.
 Arguments next_exn_stamp {A} _.
 Arguments refs {A} _.
 
+Definition state_update_refs_and_ffi A (st:state A) refs' (ffi':ffi_state A) :=
+   {| clock := clock st;
+      refs := refs';
+      ffi := ffi';
+      next_type_stamp := next_type_stamp st ;
+      next_exn_stamp := next_exn_stamp st |}.
 
 (* Other primitives *)
 Definition do_con_check (cenv : env_ctor)
            (n_opt : constr_id)
-           (l : nat) : bool :=
+           (l : nat) : bool := (* LATER: switch to Prop *)
   match n_opt with
   | None => true
   | Some n => match nsLookup n cenv with
              | None => false
-             | Some (l',_) => if (eq_nat_dec l l') then true else false
+             | Some (l',_) => If l = l' then true else false
              end
   end.
 
@@ -381,19 +399,21 @@ Fixpoint do_eq (e1 e2 : val) : eq_result :=
   | _, _ => Eq_type_error
   end.
 
+(* BACKPORT: the variable [n] should not be rebound, it's very confusing;
+   the first one should be [nfun], the second one [narg] or just [n], but
+   named in a consistant way with the non-recursive closure case. *)
+(* LATER: not needed in the relational bigstep *)
 Fixpoint do_opapp (vs : list val) : option (sem_env val * exp) :=
   match vs with
   | (Closure env n e)::v::[] =>
-    Some ({| sev := nsBind n v (sev env); sec := sec env |}, e)
+    Some (update_sev env (nsBind n v (sev env)), e)
   | (Recclosure env funs n)::v::[] =>
     if NoDup_dec String.string_dec
                  (List.map (fun p => match p with (f,x,e) => f end) funs)
     then match find_recfun n funs with
-         | Some (n,e) => Some ({| sev := nsBind n v
-                                               (build_rec_env funs env
-                                                                  (sev env));
-                                 sec := sec env
-                              |}, e)
+         | Some (n,e) => 
+            let sev' := nsBind n v (build_rec_env funs env (sev env)) in
+            Some (update_sev env sev', e)
          | None => None
          end
     else None
