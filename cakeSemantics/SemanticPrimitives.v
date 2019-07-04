@@ -54,6 +54,10 @@ Inductive val : Type :=
 | Vectorv : list val -> val.
 
 
+Instance Inhab_val : Inhab val.
+Proof using. apply (Inhab_of_val (Loc 0%nat)). Qed.
+
+
 (*-------------------------------------------------------------------*)
 (** Begin induction principle *)
 
@@ -176,10 +180,14 @@ Definition store_v_same_type (A : Type) (v1 v2 : store_v A) : bool :=
   | _, _ => false
   end.
 
+(* BACKPORT: it would scale up better to use modules to organize the names,
+   e.g. Store.empty, Store.lookup, etc.. (The C-style naming convention 
+   with everything flat eventually shows its limits... *)
+
 (* The nth item in the list is the value at location n *)
 Definition store (A : Type) := list (store_v A).
 
-Definition emptyStore (A : Type) : store A := [].
+Definition empty_store (A : Type) : store A := [].
 
 Definition store_lookup {A : Type} (n : nat) (st : store A) := nth_error st n.
 
@@ -263,6 +271,8 @@ Arguments Match_type_error {A}.
 Arguments Match {A}.
 
 (* TODO : Prop-ertize it *)
+
+(* BACKPORT: rename to a more explicit name, eg stamp_same_type *)
 Definition same_type (s1 s2 : stamp) : bool :=
   match s1, s2 with
   | TypeStamp _ n1, TypeStamp _ n2 => if (eq_nat_dec n1 n2) then true else false
@@ -364,6 +374,8 @@ Fixpoint find_recfun {A B : Type} (n : varN) (funs : list (varN * A * B))
 Inductive eq_result : Type :=
   | Eq_val : bool -> eq_result
   | Eq_type_error.
+
+
 
 (* Here we can probably start Prop-ertizing *) (* LATER: ask about it *)
 Fixpoint do_eq (e1 e2 : val) : eq_result :=
@@ -492,7 +504,7 @@ Close Scope Z_scope.
 Definition opn_lookup (op : opn) : Z -> Z -> Z :=
   match op with
   | Plus => Z.add
-  | Minus =>  Z.sub
+  | Minus => Z.sub
   | Times => Z.mul
   | Divide => Z.div
   | Modulo => Z.modulo
@@ -504,6 +516,14 @@ Definition opb_lookup (op : opb) : Z -> Z -> bool :=
   | Gt => Z.gtb
   | Leq => Z.leb
   | Geq => Z.geb
+  end.
+
+Definition opb_lookup_Prop (op : opb) : Z -> Z -> Prop :=
+  match op with
+  | Lt => Z.lt
+  | Gt => Z.gt
+  | Leq => Z.le
+  | Geq => Z.ge
   end.
 
 Definition opw8_lookup (op : opw) : word8 -> word8 -> word8 :=
@@ -540,10 +560,17 @@ Definition shift64_lookup (op : CakeAST.shift) : word64 -> nat -> word64 :=
           | Ror => id w
           end.
 
+(* BACKPORT: define these shorthands *)
+
+Definition ConvTrue := Conv (Some (TypeStamp "True"  bool_type_num)) [].
+Definition ConvFalse := Conv (Some (TypeStamp "False"  bool_type_num)) [].
+Definition ConvUnit := Conv None [].
+
 Definition Boolv (b : bool) : val :=
-  if b
-    then Conv (Some (TypeStamp "True"  bool_type_num)) []
-    else Conv (Some (TypeStamp "False" bool_type_num)) [].
+  if b then ConvTrue  else ConvFalse.
+
+Definition Propv (P:Prop) : val :=
+  Boolv (isTrue P).
 
 Inductive exp_or_val : Type :=
   | Exp : exp -> exp_or_val
