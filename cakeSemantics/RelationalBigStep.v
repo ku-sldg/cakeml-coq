@@ -120,7 +120,7 @@ Inductive appR (FFI : Type) (s : store val) (t : ffi_state FFI) : op -> list val
       appR s t Equality [v1; v2] s t (Propv P)
 
   | app_Opassign : forall s' v lnum,
-      store_assign lnum (Refv v) s = Some s' ->
+      s' = store_assign_nocheck lnum (Refv v) s ->
       appR s t Opassign [Loc lnum; v] s' t ConvUnit
 
   | app_Opref : forall s' v n,
@@ -148,12 +148,12 @@ Inductive appR (FFI : Type) (s : store val) (t : ffi_state FFI) : op -> list val
       v = LibList.nth i' vs ->
       appR s t Asub [Loc lnum; Litv (IntLit i)] s t v 
 
-  | app_Aupdate : forall lnum i n vs s' v i',
+  | app_Aupdate : forall lnum i n (vs:list val) s' v i',
       store_lookup n s = Some (Varray vs) ->
       (0 <= i < List.length vs)%Z ->
       i = Z.of_nat i' ->
-      store_assign lnum (Varray (LibList.update i' v vs)) s = Some s' ->
-      appR s t Aupdate [Loc lnum; Litv (IntLit i); v] s t ConvUnit.
+      s' = store_assign_nocheck lnum (Varray (LibList.update i' v vs)) s ->
+      appR s t Aupdate [Loc lnum; Litv (IntLit i); v] s' t ConvUnit.
 
 (** Alternative definitions using LibListZ to manipulate lists using integer indices directly
 
@@ -174,9 +174,8 @@ Inductive appR (FFI : Type) (s : store val) (t : ffi_state FFI) : op -> list val
   | app_Aupdate' : forall lnum i n vs s' v,
       store_lookup n s = Some (Varray vs) ->
       (0 <= i < List.length vs)%Z ->
-      store_assign lnum (Varray (LibContainer.update vs i v)) s = Some s' ->
-      appR s t Aupdate [Loc lnum; Litv (IntLit i); v] s t ConvUnit.
-
+      s' = store_assign_nocheck lnum (Varray (LibContainer.update vs i v)) s ->
+      appR s t Aupdate [Loc lnum; Litv (IntLit i); v] s' t ConvUnit.
 *)
 
 (* ---------------------------------------------------------------------- *)
@@ -314,6 +313,7 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
   | ELit_R : forall (l : lit), 
       expR st env (ELit l) (st, Rval (Litv l))
 
+  (* TODO: fix this rule, it should be using build_conv somehow *)
   | EConNamed_R : forall (st' : state A) (es : list exp) (vs : list val) (o : constr_id) (i : ident modN conN) (s : stamp),
       (do_type_checks -> con_check (sec env) o (length es)) ->
       argR st env es (st', Rval vs) -> 

@@ -6,7 +6,6 @@ Require Import Ascii.
 Import Bool.Sumbool.
 Require Strings.String.
 Require Import List.
-Require Import Lists.ListDec.
 Import ListNotations.
 
 (* Require Import Strings.Ascii. *)
@@ -74,12 +73,12 @@ Definition extend_dec_env (V : Type) (env env' : sem_env V) : sem_env V :=
 Unset Elimination Schemes.
 
 Inductive val : Type :=
-| Litv : lit -> val
-| Conv : option stamp -> list val -> val
-| Closure : sem_env val -> varN -> exp -> val
-| Recclosure : sem_env val -> list (varN * varN * exp) -> varN -> val
-| Loc : nat -> val
-| Vectorv : list val -> val.
+  | Litv : lit -> val
+  | Conv : option stamp -> list val -> val
+  | Closure : sem_env val -> varN -> exp -> val
+  | Recclosure : sem_env val -> list (varN * varN * exp) -> varN -> val
+  | Loc : nat -> val
+  | Vectorv : list val -> val.
 
 Instance Inhab_val : Inhab val.
 Proof using. apply (Inhab_of_val (Loc 0%nat)). Qed.
@@ -141,11 +140,6 @@ Inductive result (A : Type) (B : Type) : Type :=
   | Rval : A -> result A B
   | Rerr : error_result B -> result A B.
 
-(* Inductive result (A B : Type) : Type := *)
-(* | Rval : A -> result A B *)
-(* | RraisedErr : B -> result A B *)
-(* | RabortErr  : abort -> result A B. *)
-
 Arguments Rval {A} {B}.
 Arguments Rerr {A} {B}.
 
@@ -166,6 +160,7 @@ Arguments W8array {A}.
 Arguments Varray {A}.
 
 (* The nth item in the list is the value at location n *)
+
 Definition store (A : Type) := 
   list (store_v A).
 
@@ -196,6 +191,7 @@ Definition state_update_refs_and_ffi A (st:state A) refs' (ffi':ffi_state A) :=
       next_type_stamp := next_type_stamp st ;
       next_exn_stamp := next_exn_stamp st |}.
 
+
 (* ---------------------------------------------------------------------- *)
 (** ** Pattern-maching result *)
 
@@ -220,6 +216,9 @@ Arguments Match {A}.
 (* ---------------------------------------------------------------------- *)
 (** ** Typechecking *)
 
+(* QUESTION : when you update an array cell, don't you need to check that
+    the type of contents of that cell is preserved *)
+
 Definition store_v_same_type (A : Type) (v1 v2 : store_v A) : bool :=
   match v1, v2 with
   | Refv _, Refv _ => true
@@ -238,21 +237,11 @@ Definition lit_same_type (l1 l2 : lit) : bool :=
     | _, _ => false
   end.
 
-Definition do_con_check (cenv : env_ctor)
-           (n_opt : constr_id)
-           (l : nat) : bool := (* LATER: switch to Prop *)
-  match n_opt with
-  | None => true
-  | Some n => match nsLookup n cenv with
-             | None => false
-             | Some (l',_) => If l = l' then true else false
-             end
-  end.
-
 (* BACKPORT: rename to a more explicit name, eg stamp_same_type *)
+
 Definition same_type (s1 s2 : stamp) : bool :=
   match s1, s2 with
-  | TypeStamp _ n1, TypeStamp _ n2 => if (eq_nat_dec n1 n2) then true else false
+  | TypeStamp _ n1, TypeStamp _ n2 => If n1 = n2 then true else false
   | ExnStamp _, ExnStamp _ => true
   | _, _ => false
   end.
@@ -281,22 +270,14 @@ Inductive con_check (cenv : env_ctor) : constr_id -> nat -> Prop :=
 
 Definition empty_store (A : Type) : store A := [].
 
-Definition store_lookup {A : Type} (n : nat) (st : store A) := nth_error st n.
+Definition store_lookup {A : Type} (n : nat) (st : store A) := 
+  List.nth_error st n.
 
 Definition store_alloc {A : Type} (v : store_v A) (st : store A) : (store A * nat) :=
   (st ++ [v], length st).
 
-Definition update {A : Type} (n : nat) (v : A)  (st : list A) : list A :=
-  (firstn n st ++ [v] ++ skipn (n+1) st).
-
-Fixpoint store_assign {A : Type} (n : nat) (v : store_v A) (st : store A)
-  : option (store A) :=
-  match nth_error st n with
-  | Some v' => if store_v_same_type v' v
-              then Some (update n v st)
-              else None
-  | _ => None
-  end.
+Definition store_assign_nocheck {A : Type} (n : nat) (v : store_v A) (st : store A) : store A := 
+  LibList.update n v st.
 
 
 (* ---------------------------------------------------------------------- *)
@@ -312,28 +293,18 @@ Definition build_conv (envC : env_ctor) (cn : constr_id)
               end
   end.
 
-Definition same_ctor (s1 s2 : stamp) : bool := 
-  If s1 = s2 then true else false.
-
 
 (* ---------------------------------------------------------------------- *)
 (** ** Operations for functions *)
 
 Definition build_rec_env (funs : list (varN * varN * exp)) (cl_env : sem_env val)
            (add_to_env : env_val) : env_val :=
-  fold_right (fun trip env' => match trip with
-                          (f,x,e) => nsBind f (Recclosure cl_env funs f) env'
-                        end)
-        add_to_env
-        funs.
+  fold_right (fun '(f,x,e) env' => nsBind f (Recclosure cl_env funs f) env') add_to_env funs.
 
-Fixpoint find_recfun {A B : Type} (n : varN) (funs : list (varN * A * B))
-  : option (A * B) :=
+Fixpoint find_recfun {A B : Type} (n : varN) (funs : list (varN * A * B)) : option (A * B) :=
   match funs with
   | [] => None
-  | (f,x,e)::funs' => if String.string_dec f n
-                    then Some (x,e)
-                     else find_recfun n funs'
+  | (f,x,e)::funs' => If f = n then Some (x,e) else find_recfun n funs'
   end.
 
 
@@ -410,10 +381,7 @@ Open Scope bool_scope.
 Open Scope nat_scope.
 
 Definition build_constrs (s : nat) (condefs : list (conN * (list ast_t)) ) :=
-  List.map
-    (fun p => match p with (conN,ts) =>
-                        (conN,(length ts, TypeStamp conN s)) end)
-    condefs.
+  List.map (fun '(conN,ts) => (conN,(length ts, TypeStamp conN s))) condefs.
 
 Fixpoint build_tdefs (n : nat) (tds : list (list tvarN * typeN * list (conN * list ast_t))) : env_ctor :=
   match tds with

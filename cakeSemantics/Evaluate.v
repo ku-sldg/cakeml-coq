@@ -1,3 +1,11 @@
+(** This file is DEPRECATED and probably does not compile *)
+
+
+
+
+
+
+
 From TLC Require Import LibLogic LibReflect.
 Require Import CakeSem.CakeAST.
 Require Import CakeSem.Namespace.
@@ -10,7 +18,28 @@ Require Import List.
 Import ListNotations.
 
 (* ---------------------------------------------------------------------- *)
+(** ** Store assign *)
+
+Fixpoint store_assign {A : Type} (n : nat) (v : store_v A) (st : store A) : option (store A) :=
+  match List.nth_error st n with
+  | Some v' => if store_v_same_type v' v
+                 then Some (List.update n v st)
+                 else None
+  | _ => None
+  end.
+
+
+
+(* ---------------------------------------------------------------------- *)
+(** ** Constructor comparison *)
+
+Definition same_ctor (s1 s2 : stamp) : bool := 
+  If s1 = s2 then true else false.
+
+
+(* ---------------------------------------------------------------------- *)
 (** ** Pattern matcher *)
+
 
 (* A big-step pattern matcher.  If the value matches the pattern, return an
  * environment with the pattern variables bound to the corresponding sub-terms
@@ -74,6 +103,21 @@ Fixpoint pmatch (envC : env_ctor) (s : store val) (p : pat) (v : val)
                        end
   | Ptannot p t, val' => pmatch envC s p val' env
   | _, _ => Match_type_error
+  end.
+
+
+(* ---------------------------------------------------------------------- *)
+(** ** Typechecks *)
+
+Definition do_con_check (cenv : env_ctor)
+           (n_opt : constr_id)
+           (l : nat) : bool := (* LATER: switch to Prop *)
+  match n_opt with
+  | None => true
+  | Some n => match nsLookup n cenv with
+             | None => false
+             | Some (l',_) => If l = l' then true else false
+             end
   end.
 
 
