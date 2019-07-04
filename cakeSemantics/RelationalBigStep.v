@@ -38,40 +38,10 @@ Parameter do_type_checks : Prop.
 
 
 (* ********************************************************************** *)
-(** * Typechecking helpers *)
-
-(* ---------------------------------------------------------------------- *)
-(** ** Typechecking constructors *)
-
-(** [con_check cenv o l] asserts that the constructor (or None for a tuple) admits arity [l]. 
-    (Note that tuples admit any arity.)  
-    This is an inductive version of [do_con_check] *)
-
-Inductive con_check (cenv : env_ctor) : constr_id -> nat -> Prop :=
-
-  | con_check_none : forall l,
-      con_check cenv None l
-
-  | con_check_some : forall n l s,
-      nsLookup n cenv = Some (l,s) ->
-      con_check cenv (Some n) l.
-
-
-
-(* ********************************************************************** *)
 (** * Primitive operations *)
 
 (* ---------------------------------------------------------------------- *)
 (** ** Equality *)
-
-(** [is_closure v] captures whether [v] is a closure or a recursive closure. *)
-
-Definition is_closure (v:val) : Prop :=
-  match v with
-  | Closure _ _ _ => True
-  | Recclosure _ _ _ => True
-  | _ => False
-  end.
 
 (** [app_eq v1 v2 P] asserts that the values [v1] and [v2] are comparable
     and that the proposition [P] characterizes whether they are equal. 
@@ -92,8 +62,8 @@ Inductive app_eq : val -> val -> Prop -> Prop :=
       app_eq (Loc l1) (Loc l2) (l1 = l2)
 
   | app_eq_closure : forall v1 v2,
-      is_closure v1 -> 
-      is_closure v2 -> 
+      is_closure v1 ->
+      is_closure v2 ->
       app_eq v1 v2 True
 
   | app_eq_conv_eq : forall cn vs1 vs2 P,
