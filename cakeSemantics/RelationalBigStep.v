@@ -1,5 +1,6 @@
 Set Implicit Arguments.
 From TLC Require Import LibLogic LibReflect.
+From TLC Require LibListZ.
 Require Import CakeSem.Namespace.
 Require Import CakeSem.Utils.
 Require Import CakeSem.CakeAST.
@@ -11,6 +12,7 @@ Import ListNotations.
 Require Import ZArith.
 Require String.
 
+
 Open Scope string.
 Open Scope Z_scope.
 Open Scope list_scope.
@@ -19,25 +21,48 @@ Open Scope list_scope.
 (*--------------------------*)
 (** Notes *)
 
-(* LATER: we could use implicit types to avoid type annotations for arguments of constructors throughout the files. *)
-
-(* LATER: in opapp, the predicate checks for non-duplicate bindings in the closure, although this could 
-    be trivially maintained as an invariant of the store throughout the execution if rec defs
-    are checked at definition time. *)
-
-(* LATER: try to make result carry not a list of values but a single value, and make argR take a continuation from list val to val. *)
+(* LATER: we could use implicit types to avoid type annotations for arguments of constructors throughout the files.
+   This would reduce the clutter. However, it requires renaming a bunch of variables, and would make it harder 
+   to keep in sync with the cakeML semantics, so let's not do it now. *)
 
 (*--------------------------*)
-(** If this flag is True, then the semantics performs a few type checks like the CakeML semantics does.
+
+(** If the flag [do_type_checks] is True, then the semantics performs a few type checks like the CakeML semantics does.
     If the source code does type-check independently, then the flag may be set to False without altering the semantics. *)
 
 Parameter do_type_checks : Prop.
 
+
 (*--------------------------*)
 
 
-(* BACKPORT: move to SemanticsResults.v *)
 
+(* ********************************************************************** *)
+(** * Typechecking helpers *)
+
+(* ---------------------------------------------------------------------- *)
+(** ** Typechecking constructors *)
+
+(** [con_check cenv o l] asserts that the constructor (or None for a tuple) admits arity [l]. 
+    (Note that tuples admit any arity.)  
+    This is an inductive version of [do_con_check] *)
+
+Inductive con_check (cenv : env_ctor) : constr_id -> nat -> Prop :=
+
+  | con_check_none : forall l,
+      con_check cenv None l
+
+  | con_check_some : forall n l s,
+      nsLookup n cenv = Some (l,s) ->
+      con_check cenv (Some n) l.
+
+
+
+(* ********************************************************************** *)
+(** * Primitive operations *)
+
+(* ---------------------------------------------------------------------- *)
+(** ** Equality *)
 
 (** [is_closure v] captures whether [v] is a closure or a recursive closure. *)
 
@@ -50,7 +75,7 @@ Definition is_closure (v:val) : Prop :=
 
 (** [app_eq v1 v2 P] asserts that the values [v1] and [v2] are comparable
     and that the proposition [P] characterizes whether they are equal. 
-    
+
     [app_eq_list vs1 vs2 P] is similar, and requires the list to be of the
     same lengths. *)
 
@@ -100,11 +125,16 @@ with app_eq_list : list val -> list val -> Prop -> Prop :=
       app_eq_list vs1 vs2 Ps ->
       app_eq_list (v1::vs1) (v2::vs2) (P /\ Ps).
 
+
+(* ---------------------------------------------------------------------- *)
+(** ** Primitive operations *)
+
 (** [appr s ffi op vs s' ffi' v'] asserts that the evaluation of [op] on the arguments [vs] 
     produces output [v], and updates the states accordingly.
     This is an inductive version of do_app.
-    
+
     DISCLAIMER: currently covers only a subset of primitive functions. *)
+
 
 Inductive appR (FFI : Type) (s : store val) (t : ffi_state FFI) : op -> list val -> store val -> ffi_state FFI -> val -> Prop :=
 
@@ -133,32 +163,81 @@ Inductive appR (FFI : Type) (s : store val) (t : ffi_state FFI) : op -> list val
 
   | app_Aalloc : forall n v s' lnum n',
       n >= 0 ->
-      n = Z.of_nat n' -> (* LATER: remove using LibListZ.replicate directly *)
-      (s',lnum) = store_alloc (Varray (List_replicate n' v)) s -> (* LATER: LibListZ.replicate n *)
+      n = Z.of_nat n' ->
+      (s',lnum) = store_alloc (Varray (List_replicate n' v)) s ->
       appR s t Aalloc [Litv (IntLit n); v] s' t (Loc lnum)
 
   | app_Alength : forall n ws,
       store_lookup n s = Some (Varray ws) ->
-      appR s t Alength [Loc n] s t (Litv (IntLit (Z.of_nat (List.length ws)))) (* LATER: LibListZ.length ws *)
+      appR s t Alength [Loc n] s t (Litv (IntLit (Z.of_nat (List.length ws))))
 
   | app_Asub : forall lnum i vs v i',
       store_lookup lnum s = Some (Varray vs) ->
       (0 <= i < List.length vs)%Z ->
-      i = Z.of_nat i' -> (* LATER: remove using LibListZ directly *)
-      v = (LibList.nth i' vs) -> (* LATER: [v = LibListZ.get vs i], a.k.a. [v = vs[i]] *)
+      i = Z.of_nat i' ->
+      v = LibList.nth i' vs ->
       appR s t Asub [Loc lnum; Litv (IntLit i)] s t v 
 
   | app_Aupdate : forall lnum i n vs s' v i',
       store_lookup n s = Some (Varray vs) ->
       (0 <= i < List.length vs)%Z ->
-      i = Z.of_nat i' -> (* LATER: remove using LibListZ directly *)
-      store_assign lnum (Varray (LibList.update i' v vs)) s = Some s' -> (* LATER: [vs[i:=v]] *)
+      i = Z.of_nat i' ->
+      store_assign lnum (Varray (LibList.update i' v vs)) s = Some s' ->
       appR s t Aupdate [Loc lnum; Litv (IntLit i); v] s t ConvUnit.
 
+(** Alternative definitions using LibListZ to manipulate lists using integer indices directly
+
+  | app_Aalloc' : forall n v s' lnum,
+      n >= 0 ->
+      (s',lnum) = store_alloc (Varray (ListZ_replicate n v)) s ->
+      appR s t Aalloc [Litv (IntLit n); v] s' t (Loc lnum)
+
+  | app_Alength' : forall n ws,
+      store_lookup n s = Some (Varray ws) ->
+      appR s t Alength [Loc n] s t (Litv (IntLit (LibListZ.length ws)))
+
+  | app_Asub' : forall lnum i vs,
+      store_lookup lnum s = Some (Varray vs) ->
+      (0 <= i < List.length vs)%Z ->
+      appR s t Asub [Loc lnum; Litv (IntLit i)] s t (LibContainer.read vs i)
+
+  | app_Aupdate' : forall lnum i n vs s' v,
+      store_lookup n s = Some (Varray vs) ->
+      (0 <= i < List.length vs)%Z ->
+      store_assign lnum (Varray (LibContainer.update vs i v)) s = Some s' ->
+      appR s t Aupdate [Loc lnum; Litv (IntLit i); v] s t ConvUnit.
+
+*)
+
+(* ---------------------------------------------------------------------- *)
+(** ** Regular function calls *)
+
+(** [opapp v env n e] asserts that [v] is a closure or recursive closure
+    whose argument is named [n] and whose body is [e], to be executed in 
+    an environment [env] that includes the recursive bindings (if any).
+    This is an inductive version of [do_opapp] *)
+
+Inductive opapp : val -> sem_env val -> varN -> exp -> Prop :=
+
+  | opapp_Closure : forall (env : sem_env val) (n : varN) (e : exp) (v : val),
+      opapp (Closure env n e) env n e
+
+  | opapp_Recclosure : forall (env env': sem_env val) (funs : list (varN * varN * exp)) (nfun n : varN) (e : exp) (v : val),
+      (do_type_checks -> LibList.noduplicates (List.map (fun '(f,_,_) => f) funs)) ->
+      env' = update_sev env (build_rec_env funs env (sev env)) -> 
+      find_recfun nfun funs = Some (n,e) ->
+      opapp (Recclosure env funs nfun) env' n e.
+
+
+(* ********************************************************************** *)
+(** * Pattern matching *)
+
+(* ---------------------------------------------------------------------- *)
+(** ** Matching against one pattern *)
 
 (** [pmatchR cenv st p v r] matches a value [v] against a pattern [p] and relates it
     to a result [r] which is either [No_match] or [Match env_v] for some set of bindings [env_v].
-    
+
     Note: for tuples and constructors, the assumption [length vs = length ps] is redundant 
     with [patchlistR ... ps vs]  *)
 
@@ -223,6 +302,10 @@ with pmatchlistR : env_ctor -> store val -> list pat -> list val -> match_result
       pmatchlistR cenv sto ps vs m ->
       pmatchlistR cenv sto (p::ps) (v::vs) No_match.
 
+
+(* ---------------------------------------------------------------------- *)
+(** ** Matching against a list of clauses *)
+
 (** [matR st env v pes matchres] matches the value [v] against the list of clauses [pes],
     and returns [None] if no pattern matches, or [Some (env_v,e_clause)] if the first clause that
     applies has body [e_clause] and instantiate the pattern variables according to [env_v].
@@ -246,34 +329,12 @@ Inductive matR (A : Type) (st : state A) (env : sem_env val) : val -> list (pat 
        matR st env v pes' matchres -> 
        matR st env v ((p,e)::pes') matchres.
 
-(** [con_check cenv o l] asserts that the constructor (or None for a tuple) admits arity [l]. 
-    (Note that tuples admit any arity.)  
-    This is an inductive version of [do_con_check] *)
 
-Inductive con_check (cenv : env_ctor) : constr_id -> nat -> Prop :=
+(* ********************************************************************** *)
+(** * Evaluation *)
 
-  | con_check_none : forall l,
-      con_check cenv None l
-
-  | con_check_some : forall n l s,
-      nsLookup n cenv = Some (l,s) ->
-      con_check cenv (Some n) l.
-
-(** [opapp v env n e] asserts that [v] is a closure or recursive closure
-    whose argument is named [n] and whose body is [e], to be executed in 
-    an environment [env] that includes the recursive bindings (if any).
-    This is an inductive version of [do_opapp] *)
-
-Inductive opapp : val -> sem_env val -> varN -> exp -> Prop :=
-
-  | opapp_Closure : forall (env : sem_env val) (n : varN) (e : exp) (v : val),
-      opapp (Closure env n e) env n e
-
-  | opapp_Recclosure : forall (env env': sem_env val) (funs : list (varN * varN * exp)) (nfun n : varN) (e : exp) (v : val),
-      (do_type_checks -> LibList.noduplicates (List.map (fun '(f,_,_) => f) funs)) ->
-      env' = update_sev env (build_rec_env funs env (sev env)) -> 
-      find_recfun nfun funs = Some (n,e) ->
-      opapp (Recclosure env funs nfun) env' n e.
+(* ---------------------------------------------------------------------- *)
+(** ** Evaluation of expressions *)
 
 (** [expR st env e (st', Rval v)] asserts that, in environment [env], the expression [e] evaluates to [v],
     and updates the state from [st] to [st']. *)
@@ -284,7 +345,7 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
       expR st env (ELit l) (st, Rval (Litv l))
 
   | EConNamed_R : forall (st' : state A) (es : list exp) (vs : list val) (o : constr_id) (i : ident modN conN) (s : stamp),
-      con_check (sec env) o (length es) ->
+      (do_type_checks -> con_check (sec env) o (length es)) ->
       argR st env es (st', Rval vs) -> 
       expR st env (ECon o es) (st', Rval (Conv (Some s) vs))
 
@@ -372,6 +433,11 @@ with argR (A :Type) (st : state A) (env : sem_env val) : list exp -> ((state A) 
        argR st env es (st', Rval vs) -> 
        expR st' env e (st'', Rval v) ->
        argR st env (e::es) (st'', Rval (v::vs)).
+
+
+
+(* ---------------------------------------------------------------------- *)
+(** ** Evaluation of top-level declarations *)
 
 
 (*---------------------------TOP LEVEL DECL IS FUTURE WORK-----------------------
@@ -466,8 +532,12 @@ with argR (A :Type) (st : state A) (env : sem_env val) : list exp -> ((state A) 
 
 
 
+
+(* ********************************************************************** *)
+(** * Notes for future work *)
+
 (*--------------------------------------------------------------
-LATER: treatment of exceptions and the propagation of exceptions 
+  LATER: treatment of exceptions and the propagation of exceptions 
 
   | ERaise_R  : forall (st': state A) (e : exp) (v :val),
       expR st env e (st', Rval v) -> 
@@ -500,14 +570,12 @@ LATER: treatment of exceptions and the propagation of exceptions
       end) -> 
       expR st env (EMat e pes) res
 
-
-
   + fallthrough for every rule
     or a factorized fallthrough using pretty-big-step presentation
-*)
 
 
-(* FUTURE WORK vectors
+
+FUTURE WORK vectors
 
    | app_VfromList : forall s t v vs,
       v_to_list v = Some vs ->
@@ -532,7 +600,7 @@ FUTURE WORK more on arrays
   | app_AallocEmpty : forall s t n v s' lnum,
       (s',lnum) = store_alloc (Varray []) s ->
       appR s t AallocEmpty [ConvUnit) s' t (Loc lnum)
-    
+
 *)
 
 

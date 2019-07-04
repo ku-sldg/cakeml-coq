@@ -1,5 +1,5 @@
 Set Implicit Arguments.
-From TLC Require Import LibList.
+From TLC Require Import LibList LibInt LibLogic.
 
 (** File to put extensions to TLC *)
 
@@ -15,3 +15,7 @@ Fixpoint List_replicate A (n:nat) (x:A) : list A :=
   | O => nil
   | S n' => x :: (List_replicate n' x)
   end.
+
+Definition ListZ_replicate A (n:Z) (x:A) : list A :=
+  If n < 0 then arbitrary else List_replicate (abs n) x.
+
