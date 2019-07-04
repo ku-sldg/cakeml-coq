@@ -4,7 +4,7 @@ From TLC Require LibListZ.
 Require Import CakeSem.Namespace.
 Require Import CakeSem.Utils.
 Require Import CakeSem.CakeAST.
-Require Import CakeSem.SemanticPrimitives.
+Require Import CakeSem.SemanticsAux.
 Require Import CakeSem.ffi.FFI.
 Require Import String.
 Require Import List.

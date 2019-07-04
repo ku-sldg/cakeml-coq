@@ -6,5 +6,5 @@ Word.v
 Namespace.v
 Utils.v
 CakeAST.v
-SemanticPrimitives.v
+SemanticsAux.v
 RelationalBigStep.v
