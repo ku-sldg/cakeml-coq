@@ -38,6 +38,18 @@ Definition same_ctor (s1 s2 : stamp) : bool :=
 
 
 (* ---------------------------------------------------------------------- *)
+(** ** Constructor construction *)
+
+Definition build_conv (envC : env_ctor) (cn : constr_id) (vs : list val) : option val :=
+  match cn with
+  | None => Some (Conv None vs)
+  | Some id => match nsLookup id envC with
+              | None => None
+              | Some (len,stamp) => Some (Conv (Some stamp) vs)
+              end
+  end.
+
+(* ---------------------------------------------------------------------- *)
 (** ** Pattern matcher *)
 
 

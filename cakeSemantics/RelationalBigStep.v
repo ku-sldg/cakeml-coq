@@ -43,57 +43,57 @@ Parameter do_type_checks : Prop.
 (* ---------------------------------------------------------------------- *)
 (** ** Equality *)
 
-(** [app_eq v1 v2 P] asserts that the values [v1] and [v2] are comparable
+(** [appEq v1 v2 P] asserts that the values [v1] and [v2] are comparable
     and that the proposition [P] characterizes whether they are equal. 
 
-    [app_eq_list vs1 vs2 P] is similar, and requires the list to be of the
+    [appEqList vs1 vs2 P] is similar, and requires the list to be of the
     same lengths. *)
 
 (** BACKPORT: it is very strange to specify that all closures are equal,
     this will certainly cause end-user bugs eventually. *)
 
-Inductive app_eq : val -> val -> Prop -> Prop :=
+Inductive appEq : val -> val -> Prop -> Prop :=
 
-  | app_eq_lit : forall l1 l2,
+  | appEq_lit : forall l1 l2,
       (do_type_checks -> lit_same_type l1 l2) ->
-      app_eq (Litv l1) (Litv l2) (l1 = l2)
+      appEq (Litv l1) (Litv l2) (l1 = l2)
 
-  | app_eq_loc : forall l1 l2,
-      app_eq (Loc l1) (Loc l2) (l1 = l2)
+  | appEq_loc : forall l1 l2,
+      appEq (Loc l1) (Loc l2) (l1 = l2)
 
-  | app_eq_closure : forall v1 v2,
+  | appEq_closure : forall v1 v2,
       is_closure v1 ->
       is_closure v2 ->
-      app_eq v1 v2 True
+      appEq v1 v2 True
 
-  | app_eq_conv_eq : forall cn vs1 vs2 P,
+  | appEq_conv_eq : forall cn vs1 vs2 P,
       length vs1 = length vs2 ->
-      app_eq_list vs1 vs2 P ->
-      app_eq (Conv cn vs1) (Conv cn vs2) P
+      appEqList vs1 vs2 P ->
+      appEq (Conv cn vs1) (Conv cn vs2) P
 
-  | app_eq_conv_neq : forall cn1 cn2 vs1 vs2,
+  | appEq_conv_neq : forall cn1 cn2 vs1 vs2,
       cn1 <> cn2 ->
       (do_type_checks -> ctor_same_type cn1 cn2) ->
-      app_eq (Conv cn1 vs1) (Conv cn2 vs2) False
+      appEq (Conv cn1 vs1) (Conv cn2 vs2) False
 
-  | app_eq_vector_eq_length : forall vs1 vs2 P,
+  | appEq_vector_eq_length : forall vs1 vs2 P,
       length vs1 = length vs2 ->
-      app_eq_list vs1 vs2 P -> 
-      app_eq (Vectorv vs1) (Vectorv vs2) P
+      appEqList vs1 vs2 P -> 
+      appEq (Vectorv vs1) (Vectorv vs2) P
 
-  | app_eq_vector_neq_length : forall vs1 vs2,
+  | appEq_vector_neq_length : forall vs1 vs2,
       length vs1 <> length vs2 ->
-      app_eq (Vectorv vs1) (Vectorv vs2) False
+      appEq (Vectorv vs1) (Vectorv vs2) False
 
-with app_eq_list : list val -> list val -> Prop -> Prop :=
+with appEqList : list val -> list val -> Prop -> Prop :=
 
-  | app_eq_list_nil : 
-      app_eq_list [] [] True
+  | appEqList_nil : 
+      appEqList [] [] True
 
-  | app_eq_list_cons : forall v1 v2 vs1 vs2 P Ps,
-      app_eq v1 v2 P ->
-      app_eq_list vs1 vs2 Ps ->
-      app_eq_list (v1::vs1) (v2::vs2) (P /\ Ps).
+  | appEqList_cons : forall v1 v2 vs1 vs2 P Ps,
+      appEq v1 v2 P ->
+      appEqList vs1 vs2 Ps ->
+      appEqList (v1::vs1) (v2::vs2) (P /\ Ps).
 
 
 (* ---------------------------------------------------------------------- *)
@@ -116,7 +116,7 @@ Inductive appR (FFI : Type) (s : store val) (t : ffi_state FFI) : op -> list val
       appR s t (Opb op) [Litv (IntLit a); Litv (IntLit b)] s t (Propv (opb_lookup_Prop op a b))
 
   | app_Equality : forall (v1 v2 : val) (P:Prop),
-      app_eq v1 v2 P ->
+      appEq v1 v2 P ->
       appR s t Equality [v1; v2] s t (Propv P)
 
   | app_Opassign : forall s' v lnum,
@@ -227,12 +227,12 @@ Inductive pmatchR : env_ctor -> store val -> pat -> val -> match_result (alist v
       pmatchR cenv sto (Plit l1) (Litv l2) No_match
 
   | pmatch_Ptuple : forall cenv (sto : store val) (ps : list pat) (vs : list val) m,
-      pmatchlistR cenv sto ps vs m ->
+      pmatchListR cenv sto ps vs m ->
       pmatchR cenv sto (Pcon None ps) (Conv None vs) m
 
   | pmatch_Pcon_yes : forall cenv (sto : store val) (n : ident modN conN) (c : conN) (nstamp : stamp) (ps : list pat) (vs : list val) m,
       nsLookup n cenv = Some (length ps, nstamp) ->
-      pmatchlistR cenv sto ps vs m -> 
+      pmatchListR cenv sto ps vs m -> 
       pmatchR cenv sto (Pcon (Some n) ps) (Conv (Some nstamp) vs) m
 
   | pmatch_Pcon_no : forall cenv (sto : store val) (n : ident modN conN) (nstamp1 nstamp2 : stamp) (ps : list pat) (vs : list val),
@@ -250,26 +250,26 @@ Inductive pmatchR : env_ctor -> store val -> pat -> val -> match_result (alist v
       pmatchR cenv sto p v m -> 
       pmatchR cenv sto (Ptannot p t) v m
 
-(** [pmatchlistR cenv st ps vs r] matches a list of values [vs] against a list of patterns [ps],
+(** [pmatchListR cenv st ps vs r] matches a list of values [vs] against a list of patterns [ps],
     and relates it to a result [r] which is either [No_match] or [Match env_v] for some set of 
     bindings [env_v].
     The predicate can only hold when [ps] and [vs] have the same length. *)
 
-with pmatchlistR : env_ctor -> store val -> list pat -> list val -> match_result (alist varN val) -> Prop :=
+with pmatchListR : env_ctor -> store val -> list pat -> list val -> match_result (alist varN val) -> Prop :=
 
-  | pmatch_empty : forall cenv (sto : store val),
-      pmatchlistR cenv sto [] [] (Match [])
+  | pmatchList_nil : forall cenv (sto : store val),
+      pmatchListR cenv sto [] [] (Match [])
 
-  | pmatch_cons_yes : forall cenv (sto : store val) (p : pat) (ps : list pat) (v : val) (vs : list val) env_v1 env_v2,
+  | pmatchList_cons_yes : forall cenv (sto : store val) (p : pat) (ps : list pat) (v : val) (vs : list val) env_v1 env_v2,
       pmatchR cenv sto p v (Match env_v1) -> 
-      pmatchlistR cenv sto ps vs (Match env_v2) -> 
-      pmatchlistR cenv sto (p::ps) (v::vs) (Match (env_v1 ++ env_v2))
+      pmatchListR cenv sto ps vs (Match env_v2) -> 
+      pmatchListR cenv sto (p::ps) (v::vs) (Match (env_v1 ++ env_v2))
       (* Note: the order of nsAppend should be irrelevant because pattern variables are unique. *)
 
-  | pmatch_cons_no : forall cenv (sto : store val) (p : pat) (ps : list pat) (v : val) (vs : list val) m,
+  | pmatchList_cons_no : forall cenv (sto : store val) (p : pat) (ps : list pat) (v : val) (vs : list val) m,
       pmatchR cenv sto p v No_match ->
-      pmatchlistR cenv sto ps vs m ->
-      pmatchlistR cenv sto (p::ps) (v::vs) No_match.
+      pmatchListR cenv sto ps vs m ->
+      pmatchListR cenv sto (p::ps) (v::vs) No_match.
 
 
 (* ---------------------------------------------------------------------- *)
@@ -313,11 +313,11 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
   | ELit_R : forall (l : lit), 
       expR st env (ELit l) (st, Rval (Litv l))
 
-  (* TODO: fix this rule, it should be using build_conv somehow *)
-  | EConNamed_R : forall (st' : state A) (es : list exp) (vs : list val) (o : constr_id) (i : ident modN conN) (s : stamp),
+  | ECon_R : forall (st' : state A) (es : list exp) (vs : list val) (o : constr_id) (os : option stamp),
       (do_type_checks -> con_check (sec env) o (length es)) ->
-      argR st env es (st', Rval vs) -> 
-      expR st env (ECon o es) (st', Rval (Conv (Some s) vs))
+      expListRevR st env es (st', Rval vs) ->
+      con_build (sec env) o os ->
+      expR st env (ECon o es) (st', Rval (Conv os vs))
 
   | EVar_R : forall (v : val) (i : ident modN varN),
       nsLookup i (sev env) = Some v -> 
@@ -328,13 +328,13 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
 
   | EAppPrimitive_R : forall (st' st'' : state A) (s s' : store val) (ffi' : ffi_state A) (o : op) (es : list exp) (v : val) (vs : list val),
       o <> Opapp -> (* redundant with [appR] but perhaps convenient in proofs *)
-      argR st env es (st', Rval vs) ->
+      expListRevR st env es (st', Rval vs) ->
       appR (refs st') (ffi st') o vs s' ffi' v ->
       st'' = state_update_refs_and_ffi st' s' ffi' ->
       expR st env (EApp o es) (st'', Rval v)
 
   | EAppFunction_R  : forall (st': state A) (env' envclos : sem_env val) (ebody : exp) (es : list exp) (n : varN) v vclos res,
-      argR st env es (st', Rval [vclos; v]) -> 
+      expListRevR st env es (st', Rval [vclos; v]) -> 
       opapp vclos envclos n ebody ->
       env' = update_sev envclos (nsBind n v (sev envclos)) ->
       expR st' env' ebody res -> 
@@ -390,19 +390,19 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
       expR st env (ELannot e l) res
 
 
-(* [argR st env es (st', Rval vs)] asserts that the expressions [es] evaluate to the list of values [vs]
+(* [expListRevR st env es (st', Rval vs)] asserts that the expressions [es] evaluate to the list of values [vs]
    when evaluated in right-to-left order (mimics the [reverse es] and [reverse vs] from the Lem semantics),
    updating the state from [st] to [st']. *)
 
-with argR (A :Type) (st : state A) (env : sem_env val) : list exp -> ((state A) * result (list val) val) -> Prop :=
+with expListRevR (A :Type) (st : state A) (env : sem_env val) : list exp -> ((state A) * result (list val) val) -> Prop :=
 
-   | argR_nil : 
-       argR st env [] (st, Rval [])
+   | expListRevR_nil : 
+       expListRevR st env [] (st, Rval [])
 
-   | argR_cons : forall (st' st'' : state A) (e : exp) (v : val) (es : list exp) (vs : list val),
-       argR st env es (st', Rval vs) -> 
+   | expListRevR_cons : forall (st' st'' : state A) (e : exp) (v : val) (es : list exp) (vs : list val),
+       expListRevR st env es (st', Rval vs) -> 
        expR st' env e (st'', Rval v) ->
-       argR st env (e::es) (st'', Rval (v::vs)).
+       expListRevR st env (e::es) (st'', Rval (v::vs)).
 
 
 
@@ -410,7 +410,7 @@ with argR (A :Type) (st : state A) (env : sem_env val) : list exp -> ((state A) 
 (** ** Evaluation of top-level declarations *)
 
 
-(*---------------------------TOP LEVEL DECL IS FUTURE WORK-----------------------
+(*---------------------------TOP LEVEL DECL IS YET TO DO-----------------------
 
   Inductive combineDecResultR (env : sem_env val) : result (sem_env val) val -> result (sem_env val) val -> Prop :=
     | combineRerr : forall (e : error_result val), 
@@ -418,7 +418,7 @@ with argR (A :Type) (st : state A) (env : sem_env val) : list exp -> ((state A) 
     | combineRval : forall (env' : sem_env val),
         combineDecResultR env (Rval env') (Rval {| sev := nsAppend (sev env') (sev env);
                                                    sec := nsAppend (sec env') (sec env) |}).
-                                                   (* TODO: use extend_dec_env *)
+                                                   (* --here: use extend_dec_env *)
 
   Inductive decR (A : Type) (st : state A) (env : sem_env val) : dec -> (state A) * (result (sem_env val) val) -> Prop :=
 
@@ -519,10 +519,10 @@ with argR (A :Type) (st : state A) (env : sem_env val) : list exp -> ((state A) 
       expR st env (EHandle e l) (st'', r)
 
    | ArgsFail : forall (st' st'': state A) (res_val : result (list val) val) (err : error_result val) (e : exp) (es : list exp),
-       argR st env es (st', res_val) -> expR st' env e (st'', Rerr err) ->
-       argR st env (e::es) (st'', Rerr err)
+       expListRevR st env es (st', res_val) -> expR st' env e (st'', Rerr err) ->
+       expListRevR st env (e::es) (st'', Rerr err)
    | ArgsPrevFail : forall (st' st'' : state A) (e : exp) (v : val) (es : list exp) (err : error_result val),
-       argR st env es (st', Rerr err) -> argR st env (e::es) (st', Rerr err)
+       expListRevR st env es (st', Rerr err) -> expListRevR st env (e::es) (st', Rerr err)
   | DconsRerr_R : forall (st' : state A) (d : dec) (ds : list dec) (res : result (sem_env val) val) (err_v : error_result val),
       decR st env d (st', res) -> 
       combineDecResultR env res (Rerr err_v) ->

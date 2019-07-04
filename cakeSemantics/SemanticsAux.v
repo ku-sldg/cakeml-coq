@@ -216,9 +216,6 @@ Arguments Match {A}.
 (* ---------------------------------------------------------------------- *)
 (** ** Typechecking *)
 
-(* QUESTION : when you update an array cell, don't you need to check that
-    the type of contents of that cell is preserved *)
-
 Definition store_v_same_type (A : Type) (v1 v2 : store_v A) : bool :=
   match v1, v2 with
   | Refv _, Refv _ => true
@@ -283,16 +280,15 @@ Definition store_assign_nocheck {A : Type} (n : nat) (v : store_v A) (st : store
 (* ---------------------------------------------------------------------- *)
 (** ** Operations on constructors *)
 
-Definition build_conv (envC : env_ctor) (cn : constr_id)
-           (vs : list val) : option val :=
-  match cn with
-  | None => Some (Conv None vs)
-  | Some id => match nsLookup id envC with
-              | None => None
-              | Some (len,stamp) => Some (Conv (Some stamp) vs)
-              end
-  end.
+(** [con_build cenv n s] relates a constructor name [n] with its stamp [s]
+    This is an inductive version of [build_conv]. *)
 
+Inductive con_build (cenv : env_ctor) : constr_id -> option stamp -> Prop :=
+  | con_build_none :
+      con_build cenv None None
+  | con_build_some : forall n l s,
+      nsLookup n cenv = Some (l,s) ->
+      con_build cenv (Some n) (Some s).
 
 (* ---------------------------------------------------------------------- *)
 (** ** Operations for functions *)
@@ -335,7 +331,6 @@ Definition opb_lookup_Prop (op : opb) : Z -> Z -> Prop :=
   | Leq => Z.le
   | Geq => Z.ge
   end.
-
 
 Parameter opw8_lookup : forall (op : opw), word8 -> word8 -> word8.
 (* TODO: implement
