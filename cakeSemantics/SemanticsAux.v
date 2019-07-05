@@ -20,6 +20,8 @@ Require Import CakeSem.CakeAST.
 Open Scope string_scope.
 Open Scope list_scope.
 
+(** LATER: throughout the files, every definition should have all its arguments
+    and its return type explicit. This helps a lot reading the specification. *)
 
 (* ********************************************************************** *)
 (** * Auxiliary semantics constructs *)
@@ -55,16 +57,22 @@ Record sem_env (V : Type) := {
 Arguments sev {V} _.
 Arguments sec {V} _.
 
+(** Auxiliary definition to mimic [{ env with sev = .. }] *)
 Definition update_sev V (e:sem_env V) (x:namespace modN varN V) :=
   {| sev := x; sec := sec e |}.
 
+(** Auxiliary definition to mimic [{ env with sec = .. }] *)
 Definition update_sec V (e:sem_env V) x :=
   {| sev := sev e; sec := x |}.
 
+(* BACKPORT: use this definition in semantics *)
+Definition empty_sem_env {V : Type} : sem_env V := 
+  {| sev := nsEmpty; sec := nsEmpty |}.
 
-Definition extend_dec_env (V : Type) (env env' : sem_env V) : sem_env V :=
-  {| sev := nsAppend (sev env) (sev env'); 
-     sec := nsAppend (sec env) (sec env')|}.
+(* BACKPORT: extend_dec_env should be used in definition of combine_dec_result *)
+Definition extend_dec_env (V : Type) (new_env env : sem_env V) : sem_env V :=
+  {| sev := nsAppend (sev new_env) (sev env); 
+     sec := nsAppend (sec new_env) (sec env)|}.
 
 
 (* ---------------------------------------------------------------------- *)
@@ -190,6 +198,22 @@ Definition state_update_refs_and_ffi A (st:state A) refs' (ffi':ffi_state A) :=
       ffi := ffi';
       next_type_stamp := next_type_stamp st ;
       next_exn_stamp := next_exn_stamp st |}.
+
+(** Auxiliary definition to mimic [{ st with next_type_stamp = .. }] *)
+Definition state_update_next_type_stamp A (st:state A) x :=
+   {| clock := clock st;
+      refs := refs st;
+      ffi := ffi st;
+      next_type_stamp := x ;
+      next_exn_stamp := next_exn_stamp st |}.
+
+(** Auxiliary definition to mimic [{ st with next_exn_stamp = .. }] *)
+Definition state_update_next_exn_stamp A (st:state A) x :=
+   {| clock := clock st;
+      refs := refs st;
+      ffi := ffi st;
+      next_type_stamp := next_type_stamp st ;
+      next_exn_stamp := x |}.
 
 
 (* ---------------------------------------------------------------------- *)
@@ -378,12 +402,12 @@ Open Scope nat_scope.
 Definition build_constrs (s : nat) (condefs : list (conN * (list ast_t)) ) :=
   List.map (fun '(conN,ts) => (conN,(length ts, TypeStamp conN s))) condefs.
 
-Fixpoint build_tdefs (n : nat) (tds : list (list tvarN * typeN * list (conN * list ast_t))) : env_ctor :=
+Fixpoint build_tdefs (next_stamp : nat) (tds : list (list tvarN * typeN * list (conN * list ast_t))) : env_ctor :=
   match tds with
   | [] => alist_to_ns []
   | (tvars,tn,condefs)::tds' => nsAppend
-                                (build_tdefs (n + 1) tds')
-                                (alist_to_ns (List.rev (build_constrs n condefs)))
+                                (build_tdefs (next_stamp + 1) tds')
+                                (alist_to_ns (List.rev (build_constrs next_stamp condefs)))
   end.
 
 
