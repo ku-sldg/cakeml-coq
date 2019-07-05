@@ -27,10 +27,13 @@ Open Scope list_scope.
 
 (*--------------------------*)
 
-(** If the flag [do_type_checks] is True, then the semantics performs a few type checks like the CakeML semantics does.
+(** If the flag [doTypeChecks] is True, then the semantics performs a few type checks like the CakeML semantics does.
     If the source code does type-check independently, then the flag may be set to False without altering the semantics. *)
 
-Parameter do_type_checks : Prop.
+Parameter doTypeChecks : bool.
+
+Definition TypeCheck (P:Prop) :=
+  if doTypeChecks then P else True.
 
 
 (*--------------------------*)
@@ -55,7 +58,7 @@ Parameter do_type_checks : Prop.
 Inductive appEq : val -> val -> Prop -> Prop :=
 
   | appEq_lit : forall l1 l2,
-      (do_type_checks -> lit_same_type l1 l2) ->
+      TypeCheck (lit_same_type l1 l2) ->
       appEq (Litv l1) (Litv l2) (l1 = l2)
 
   | appEq_loc : forall l1 l2,
@@ -73,7 +76,7 @@ Inductive appEq : val -> val -> Prop -> Prop :=
 
   | appEq_conv_neq : forall cn1 cn2 vs1 vs2,
       cn1 <> cn2 ->
-      (do_type_checks -> ctor_same_type cn1 cn2) ->
+      TypeCheck (ctor_same_type cn1 cn2) ->
       appEq (Conv cn1 vs1) (Conv cn2 vs2) False
 
   | appEq_vector_eq_length : forall vs1 vs2 P,
@@ -192,7 +195,7 @@ Inductive opapp : val -> sem_env val -> varN -> exp -> Prop :=
       opapp (Closure env n e) env n e
 
   | opapp_Recclosure : forall (env env': sem_env val) (funs : list (varN * varN * exp)) (nfun n : varN) (e : exp) (v : val),
-      (do_type_checks -> LibList.noduplicates (List.map (fun '(f,_,_) => f) funs)) ->
+      TypeCheck (LibList.noduplicates (List.map (fun '(f,_,_) => f) funs)) ->
       env' = update_sev env (build_rec_env funs env (sev env)) -> 
       find_recfun nfun funs = Some (n,e) ->
       opapp (Recclosure env funs nfun) env' n e.
@@ -222,7 +225,7 @@ Inductive pmatchR : env_ctor -> store val -> pat -> val -> match_result (alist v
       pmatchR cenv sto (Plit l) (Litv l) (Match [])
 
   | pmatch_Plit_no : forall cenv (sto : store val) (v : val) (l1 l2 : lit),
-      (do_type_checks -> lit_same_type l1 l2) ->
+      TypeCheck (lit_same_type l1 l2) ->
       l1 <> l2 ->
       pmatchR cenv sto (Plit l1) (Litv l2) No_match
 
@@ -237,7 +240,7 @@ Inductive pmatchR : env_ctor -> store val -> pat -> val -> match_result (alist v
 
   | pmatch_Pcon_no : forall cenv (sto : store val) (n : ident modN conN) (nstamp1 nstamp2 : stamp) (ps : list pat) (vs : list val),
       nsLookup n cenv = Some (length ps, nstamp2) ->
-      (do_type_checks -> same_type nstamp1 nstamp2) ->
+      TypeCheck (same_type nstamp1 nstamp2) ->
       nstamp1 <> nstamp2 ->
       pmatchR cenv sto (Pcon (Some n) ps) (Conv (Some nstamp1) vs) No_match
 
@@ -288,12 +291,12 @@ Inductive matR (A : Type) (st : state A) (env : sem_env val) : val -> list (pat 
       matR st env v [] None
 
    | matR_ConsMatch : forall (v : val) (p : pat) (e : exp) (pes' : list (pat * exp)) env_v,
-       (do_type_checks -> LibList.noduplicates (pat_bindings p)) ->
+       TypeCheck (LibList.noduplicates (pat_bindings p)) ->
        pmatchR (sec env) (refs st) p v (Match env_v) -> 
        matR st env v ((p,e)::pes') (Some (env_v,e))
 
    | matR_ConsNoMatch : forall (v : val) (p : pat) (e :exp) (pes' : list (pat * exp)) matchres,
-       (do_type_checks -> LibList.noduplicates (pat_bindings p)) ->
+       TypeCheck (LibList.noduplicates (pat_bindings p)) ->
        pmatchR (sec env) (refs st) p v No_match -> 
        matR st env v pes' matchres -> 
        matR st env v ((p,e)::pes') matchres.
@@ -314,7 +317,7 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
       expR st env (ELit l) (st, Rval (Litv l))
 
   | ECon_R : forall (st' : state A) (es : list exp) (vs : list val) (o : constr_id) (os : option stamp),
-      (do_type_checks -> con_check (sec env) o (length es)) ->
+      TypeCheck (con_check (sec env) o (length es)) ->
       expListRevR st env es (st', Rval vs) ->
       con_build (sec env) o os ->
       expR st env (ECon o es) (st', Rval (Conv os vs))

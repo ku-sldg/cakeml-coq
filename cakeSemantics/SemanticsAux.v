@@ -27,7 +27,7 @@ Open Scope list_scope.
 (* ---------------------------------------------------------------------- *)
 (** ** Stamps and predefined constructors *)
 
-Inductive stamp : Set :=
+Inductive stamp : Type :=
   | TypeStamp : conN -> nat -> stamp
   | ExnStamp : nat -> stamp.
 
