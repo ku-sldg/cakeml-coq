@@ -32,14 +32,14 @@ Inductive opw : Type :=
   | Andw : opw
   | Orw : opw
   | Xorw : opw
-  | Addw : opw.
-  (* | Subw : opw. *)
+  | Addw : opw
+  | Subw : opw.
 
 Inductive shift : Type :=
   | Lsl : shift
   | Lsr : shift
   | Asr : shift
-  | Ror : shift.    
+  | Ror : shift.
 
 Definition modN := string.
 
@@ -55,16 +55,32 @@ Inductive word_size : Type :=
   | W8 : word_size
   | W64 : word_size.
 
+
+Inductive fpcmp : Type :=
+| FP_Less | FP_LessEqual | FP_Greater | FP_GreaterEqual | FP_Equal.
+
+Inductive fpuop : Type :=
+| FP_Abs | FP_Neg | FP_Sqrt.
+
+Inductive fpbop : Type :=
+| FP_Add | FP_Sub | FP_Mul | FP_Div.
+
+Inductive fptop : Type :=
+|  FP_Fma.
+
+
 Inductive op : Type :=
   | Opn : opn -> op
   | Opb : opb -> op
   | Opw : word_size -> opw -> op
   | Shift : word_size -> shift -> nat -> op
   | Equality : op
-  (* Floating point currently d.n.e *)
-  (* | OpFpCmp *)
-  (* | OpFpUmp *)
-  (* | OpFpBmp *)
+  (* Floating point is currently not supported and
+   * only included for translation purposes *)
+  | OpFpCmp : fpcmp -> op
+  | OpFpUop : fpuop -> op
+  | OpFpBop : fpbop -> op
+  | OpFpTop : fptop -> op
   | Opapp : op
   | Opassign : op
   | Opref : op
@@ -79,10 +95,12 @@ Inductive op : Type :=
   | CopyStrAw8 : op
   | CopyAw8Str : op
   | CopyAw8Aw8 : op
+
   | Ord : op
   | Chr : op
   | Chopb : opb -> op
   | Implode : op
+  | Explode : op
   | Strsub : op
   | Strlen : op
   | Strcat : op
@@ -121,7 +139,7 @@ Unset Elimination Schemes.
 (* Types *)
 
 (** BACKPORT this definition to Cakeml Lem semantics *)
-Definition constr_id : Type := 
+Definition constr_id : Type :=
   option (ident modN conN).
 
 Inductive ast_t : Type :=
@@ -139,7 +157,7 @@ Inductive pat : Type :=
   | Ptannot : pat -> ast_t -> pat.
 
 (* locs Defined elsewhere in the Lem spec *)
-Definition locs : Type := nat.
+Definition locs : Type := list nat.
 
 (* Expressions *)
 Inductive exp : Type :=
@@ -158,7 +176,9 @@ Inductive exp : Type :=
   | ETannot : exp -> ast_t -> exp
   | ELannot : exp -> locs -> exp.
 
-Definition typeDef : Type := 
+Hint Constructors exp.
+
+Definition typeDef : Type :=
   list (list tvarN * typeN * list (conN * list ast_t)).
 
 (* Declarations *)
@@ -379,4 +399,3 @@ Definition dec_ind (P : dec -> Prop) := dec_rect P.
 
 (** End induction principle *)
 (*-------------------------------------------------------------------*)
-
