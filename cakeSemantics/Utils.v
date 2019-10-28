@@ -36,13 +36,13 @@ Definition word8_to_char (w : word8) : char :=
   end.
 
 Definition char_to_word8 (c : char) : word8 :=
-  let n := (Ascii.nat_of_ascii c) in 
+  let n := (Ascii.nat_of_ascii c) in
   Word 8 (n mod 2 ^ 8) (Oneq 8 n).
 
 (** Conversion between [string] and [list char]
 
-    Remark: it would make so much more sense for [string] to be defined 
-    as [list char]. The caveat for switching representation is that Coq 
+    Remark: it would make so much more sense for [string] to be defined
+    as [list char]. The caveat for switching representation is that Coq
     hardcodes the parsing at type [string]. *)
 
 Fixpoint string_to_list_char (str : string) : list char :=

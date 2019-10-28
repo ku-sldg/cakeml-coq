@@ -33,7 +33,7 @@ Fixpoint store_assign {A : Type} (n : nat) (v : store_v A) (st : store A) : opti
 (* ---------------------------------------------------------------------- *)
 (** ** Constructor comparison *)
 
-Definition same_ctor (s1 s2 : stamp) : bool := 
+Definition same_ctor (s1 s2 : stamp) : bool :=
   If s1 = s2 then true else false.
 
 
@@ -189,7 +189,7 @@ Fixpoint do_opapp (vs : list val) : option (sem_env val * exp) :=
     if NoDup_dec String.string_dec
                  (List.map (fun p => match p with (f,x,e) => f end) funs)
     then match find_recfun n funs with
-         | Some (n,e) => 
+         | Some (n,e) =>
             let sev' := nsBind n v (build_rec_env funs env (sev env)) in
             Some (update_sev env sev', e)
          | None => None

@@ -66,12 +66,12 @@ Definition update_sec V (e:sem_env V) x :=
   {| sev := sev e; sec := x |}.
 
 (* BACKPORT: use this definition in semantics *)
-Definition empty_sem_env {V : Type} : sem_env V := 
+Definition empty_sem_env {V : Type} : sem_env V :=
   {| sev := nsEmpty; sec := nsEmpty |}.
 
 (* BACKPORT: extend_dec_env should be used in definition of combine_dec_result *)
 Definition extend_dec_env (V : Type) (new_env env : sem_env V) : sem_env V :=
-  {| sev := nsAppend (sev new_env) (sev env); 
+  {| sev := nsAppend (sev new_env) (sev env);
      sec := nsAppend (sec new_env) (sec env)|}.
 
 
@@ -169,7 +169,7 @@ Arguments Varray {A}.
 
 (* The nth item in the list is the value at location n *)
 
-Definition store (A : Type) := 
+Definition store (A : Type) :=
   list (store_v A).
 
 
@@ -234,7 +234,7 @@ Arguments Match {A}.
 (** * Auxiliary operations *)
 
 (* BACKPORT: it would scale up better to use modules to organize the names,
-   e.g. Store.empty, Store.lookup, etc.. (The C-style naming convention 
+   e.g. Store.empty, Store.lookup, etc.. (The C-style naming convention
    with everything flat eventually shows its limits... *)
 
 (* ---------------------------------------------------------------------- *)
@@ -274,8 +274,8 @@ Definition ctor_same_type (c1 c2 : option stamp) : bool :=
     | _, _ => false
 end.
 
-(** [con_check cenv o l] asserts that the constructor (or None for a tuple) admits arity [l]. 
-    (Note that tuples admit any arity.)  
+(** [con_check cenv o l] asserts that the constructor (or None for a tuple) admits arity [l].
+    (Note that tuples admit any arity.)
     This is an inductive version of [do_con_check] *)
 
 Inductive con_check (cenv : env_ctor) : constr_id -> nat -> Prop :=
@@ -291,13 +291,13 @@ Inductive con_check (cenv : env_ctor) : constr_id -> nat -> Prop :=
 
 Definition empty_store (A : Type) : store A := [].
 
-Definition store_lookup {A : Type} (n : nat) (st : store A) := 
+Definition store_lookup {A : Type} (n : nat) (st : store A) :=
   List.nth_error st n.
 
 Definition store_alloc {A : Type} (v : store_v A) (st : store A) : (store A * nat) :=
   (st ++ [v], length st).
 
-Definition store_assign_nocheck {A : Type} (n : nat) (v : store_v A) (st : store A) : store A := 
+Definition store_assign_nocheck {A : Type} (n : nat) (v : store_v A) (st : store A) : store A :=
   LibList.update n v st.
 
 
@@ -538,4 +538,3 @@ Fixpoint val_rect (P : val -> Type)
 
 Definition val_ind (P : val -> Prop) := @val_rect P.
 Definition val_rec (P : val -> Set) := @val_rect P.
-

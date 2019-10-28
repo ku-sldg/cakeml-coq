@@ -72,9 +72,9 @@ Fixpoint nsLookupMod {M N V : Type} (ns : namespace M N V) (xs : list M) : optio
                                             end)
                                      ns)
                              ms
-  end. 
+  end.
 
-Definition nsEmpty {M N V : Type} := 
+Definition nsEmpty {M N V : Type} :=
   @nil ((ident M N) * V).
 
 Definition nsAppend {M N V : Type} (ns1 : namespace M N V) (ns2 : namespace M N V) : namespace M N V :=
@@ -107,7 +107,7 @@ Definition nsSub {M N V1 V2 : Type}
            (rel : ident M N -> V1 -> V2 -> Prop)
            (ns1 : namespace M N V1)
            (ns2 : namespace M N V2) : Prop :=
-     (forall (id : ident M N) (v1 : V1), nsLookup id ns1 = Some v1 -> 
+     (forall (id : ident M N) (v1 : V1), nsLookup id ns1 = Some v1 ->
        exists (v2 : V2), nsLookup id ns2 = Some v2 /\ rel id v1 v2)
   /\ (forall (id : ident M N), nsLookup id ns1 = None -> nsLookup id ns2 = None).
 
@@ -117,7 +117,7 @@ Definition nsAll {M N V : Type} `{EqDec M eq} `{EqDec N eq} `{EqDec V}
   (forall (id : ident M N) (v : V),
      nsLookup id ns = Some v -> rel id v).
 
-Definition eAll2 {M N V1 V2 : Type} (rel : ident M N -> V1 -> V2 -> Prop) 
+Definition eAll2 {M N V1 V2 : Type} (rel : ident M N -> V1 -> V2 -> Prop)
   (ns1 : namespace M N V1) (ns2 : namespace M N V2) : Prop :=
   nsSub rel ns1 ns2 /\ nsSub (fun x y z => rel x z y) ns2 ns1.
 
@@ -129,7 +129,7 @@ Definition eAll2 {M N V1 V2 : Type} (rel : ident M N -> V1 -> V2 -> Prop)
  (*  nsLookup ns id = Just v *)
  (* { n | forall (v IN universal) (n IN universal) | nsLookup env n = Just v } *)
 
-Definition extractIds {M N V : Type} (ns : namespace M N V) : list (ident M N) := 
+Definition extractIds {M N V : Type} (ns : namespace M N V) : list (ident M N) :=
   map fst ns.
 
 Fixpoint extractMods {M N V : Type} (ns : namespace M N V) : list (list M) :=
