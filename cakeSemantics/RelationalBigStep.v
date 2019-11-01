@@ -206,10 +206,10 @@ Inductive appR (FFI : Type) (s : store val) (t : ffi_state FFI) : op -> list val
 
 Inductive opapp : val -> sem_env val -> varN -> exp -> Prop :=
 
-  | opapp_Closure : forall (env : sem_env val) (n : varN) (e : exp) (v : val),
+  | opapp_Closure : forall (env : sem_env val) (n : varN) (e : exp),
       opapp (Closure env n e) env n e
 
-  | opapp_Recclosure : forall (env env': sem_env val) (funs : list (varN * varN * exp)) (nfun n : varN) (e : exp) (v : val),
+  | opapp_Recclosure : forall (env env': sem_env val) (funs : list (varN * varN * exp)) (nfun n : varN) (e : exp),
       TypeCheck (UniqueRecIdent funs) ->
       env' = update_sev env (build_rec_env funs env (sev env)) ->
       find_recfun nfun funs = Some (n,e) ->
@@ -236,10 +236,10 @@ Inductive pmatchR : env_ctor -> store val -> pat -> val -> match_result (alist v
   | pmatchR_Pvar : forall cenv (sto : store val) (v : val) (x : varN),
       pmatchR cenv sto (Pvar x) v (Match [(x,v)])
 
-  | pmatchR_Plit_yes : forall cenv (sto : store val) (v : val) (l : lit),
+  | pmatchR_Plit_yes : forall cenv (sto : store val) (l : lit),
       pmatchR cenv sto (Plit l) (Litv l) (Match [])
 
-  | pmatchR_Plit_no : forall cenv (sto : store val) (v : val) (l1 l2 : lit),
+  | pmatchR_Plit_no : forall cenv (sto : store val) (l1 l2 : lit),
       TypeCheck (lit_same_type l1 l2) ->
       l1 <> l2 ->
       pmatchR cenv sto (Plit l1) (Litv l2) No_match
@@ -248,7 +248,7 @@ Inductive pmatchR : env_ctor -> store val -> pat -> val -> match_result (alist v
       pmatchListR cenv sto ps vs m ->
       pmatchR cenv sto (Pcon None ps) (Conv None vs) m
 
-  | pmatchR_PconYes : forall cenv (sto : store val) (n : ident modN conN) (c : conN) (nstamp : stamp) (ps : list pat) (vs : list val) m,
+  | pmatchR_PconYes : forall cenv (sto : store val) (n : ident modN conN) (nstamp : stamp) (ps : list pat) (vs : list val) m,
       nsLookup n cenv = Some (length ps, nstamp) ->
       pmatchListR cenv sto ps vs m ->
       pmatchR cenv sto (Pcon (Some n) ps) (Conv (Some nstamp) vs) m
@@ -341,10 +341,10 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
       nsLookup i (sev env) = Some v ->
       expR st env (EVar i) (st, Rval v)
 
-  | expR_EFun : forall (e : exp) (v : val) (x : varN),
+  | expR_EFun : forall (e : exp) (x : varN),
       expR st env (EFun x e) (st, Rval (Closure env x e))
 
-  | expR_EAppPrimitive : forall (st' st'' : state A) (s s' : store val) (ffi' : ffi_state A) (o : op) (es : list exp) (v : val) (vs : list val),
+  | expR_EAppPrimitive : forall (st' st'' : state A) (s' : store val) (ffi' : ffi_state A) (o : op) (es : list exp) (v : val) (vs : list val),
       o <> Opapp -> (* redundant with [appR] but perhaps convenient in proofs *)
       expListRevR st env es (st', Rval vs) ->
       appR (refs st') (ffi st') o vs s' ffi' v ->
@@ -358,7 +358,7 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
       expR st' env' ebody res ->
       expR st env (EApp Opapp es) res
 
-  | expR_ELogFst : forall (env' : sem_env val) (st' : state A) (op : lop) (e e1 e2 : exp) (v v1: val),
+  | expR_ELogFst : forall (st' : state A) (op : lop) (e1 e2 : exp) (v1: val),
       expR st env e1 (st', Rval v1) ->
       (match op with
        | And => v1 = Boolv false
@@ -366,7 +366,7 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
        end) ->
       expR st env (ELog op e1 e2) (st', Rval v1)
 
-  | expR_ELogSnd : forall (env' : sem_env val) (st' : state A) (op : lop) (e e1 e2 : exp) (v v1: val) res,
+  | expR_ELogSnd : forall (st' : state A) (op : lop) (e1 e2 : exp) (v1: val) res,
       expR st env e1 (st', Rval v1) ->
       (match op with
        | And => v1 = Boolv true
@@ -423,7 +423,6 @@ with expListRevR (A :Type) (st : state A) (env : sem_env val) : list exp -> ((st
        expListRevR st env (e::es) (st'', Rval (v::vs)).
 
 
-
 (* ---------------------------------------------------------------------- *)
 (** ** Evaluation of top-level declarations *)
 
@@ -442,8 +441,7 @@ Inductive decR (A : Type) (st : state A) (env : sem_env val) : dec -> (state A) 
       env' = {| sev := build_rec_env funs env nsEmpty ; sec := nsEmpty |} ->
       decR st env (Dletrec l funs) (st, Rval env')
 
-  | decR_Dtype : forall (env' : sem_env val) (st' st'' : state A) (res : result (sem_env val) val)
-                (l : locs) (tds : typeDef),
+  | decR_Dtype : forall (env' : sem_env val) (st' : state A) (l : locs) (tds : typeDef),
       UniqueCtorsInDefs tds ->
       st' = state_update_next_type_stamp st (next_type_stamp st + length tds) ->
       env' = {| sev := nsEmpty ; sec := build_tdefs (next_type_stamp st) tds |} ->
@@ -457,13 +455,12 @@ Inductive decR (A : Type) (st : state A) (env : sem_env val) : dec -> (state A) 
       env' = {| sev := nsEmpty; sec := nsSing cn (length ts, ExnStamp (next_exn_stamp st)) |} ->
       decR st env (Dexn loc cn ts) (st', Rval env')
 
-  | decR_Dmod : forall (st' st'' : state A) (env' env'' : sem_env val) (res : result (sem_env val) val) (mn : modN) (ds : list dec),
+  | decR_Dmod : forall (st' : state A) (env' env'' : sem_env val) (mn : modN) (ds : list dec),
       decListR st env ds (st', Rval env') ->
       env'' = {| sev := nsLift mn (sev env'); sec := nsLift mn (sec env') |} ->
       decR st env (Dmod mn ds) (st', Rval env'')
 
-  | decR_Dlocal : forall (st' : state A) (env' : sem_env val) (lds ds : list dec)
-               (d : list dec) res,
+  | decR_Dlocal : forall (st' : state A) (env' : sem_env val) (lds ds : list dec) res,
       decListR st env lds (st', Rval env') ->
       decListR st' (extend_dec_env env' env) ds res ->
       decR st env (Dlocal lds ds) res
@@ -477,10 +474,6 @@ with decListR (A : Type) (st : state A) (env : sem_env val) : list dec -> (state
       decR st env d (st', Rval env1) ->
       decListR st' (extend_dec_env env1 env) ds (st'', Rval env2) ->
       decListR st env (d::ds) (st'', Rval (extend_dec_env env2 env1)).
-
-
-
-
 
 
 (* ********************************************************************** *)
