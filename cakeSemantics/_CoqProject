@@ -4,7 +4,9 @@ ffi/SimpleIO.v
 TLCbuffer.v
 Word.v
 Namespace.v
+NamespaceTheory.v
 Utils.v
 CakeAST.v
+DecidabilityTheory.v
 SemanticsAux.v
 RelationalBigStep.v
