@@ -442,7 +442,7 @@ Inductive decR (A : Type) (st : state A) (env : sem_env val) : dec -> (state A) 
       decR st env (Dletrec l funs) (st, Rval env')
 
   | decR_Dtype : forall (env' : sem_env val) (st' : state A) (l : locs) (tds : typeDef),
-      UniqueCtorsInDefs tds ->
+      TypeCheck (UniqueCtorsInDefs tds) ->
       st' = state_update_next_type_stamp st (next_type_stamp st + length tds) ->
       env' = {| sev := nsEmpty ; sec := build_tdefs (next_type_stamp st) tds |} ->
       decR st env (Dtype l tds) (st', Rval env')
