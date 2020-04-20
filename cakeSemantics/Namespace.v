@@ -54,11 +54,11 @@ Fixpoint get_modded_namespace {M N V : Type} (m : M) (ns : namespace M N V) : na
                   end
   end.
 
-Fixpoint nsLookup {M N V : Type} (id : ident M N) (ns : namespace M N V) : option V :=
-  match id with
-  | Short n => lookup id ns
-  | Long m id' => nsLookup id' (get_modded_namespace m ns)
-  end.
+Definition nsLookup {M N V : Type} (id : ident M N) (ns : namespace M N V) : option V := lookup id ns.
+  (* match id with *)
+  (* | Short n => lookup id ns *)
+  (* | Long m id' => nsLookup id' (get_modded_namespace m ns) *)
+  (* end. *)
 
 (* LATER: use LibList.filter *)
 
