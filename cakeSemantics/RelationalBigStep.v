@@ -344,19 +344,19 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
   | expR_EFun : forall (e : exp) (x : varN),
       expR st env (EFun x e) (st, Rval (Closure env x e))
 
-  | expR_EAppPrimitive : forall (st' st'' : state A) (s' : store val) (ffi' : ffi_state A) (o : op) (es : list exp) (v : val) (vs : list val),
-      o <> Opapp -> (* redundant with [appR] but perhaps convenient in proofs *)
-      expListRevR st env es (st', Rval vs) ->
-      appR (refs st') (ffi st') o vs s' ffi' v ->
-      st'' = state_update_refs_and_ffi st' s' ffi' ->
-      expR st env (EApp o es) (st'', Rval v)
-
   | expR_EAppFunction  : forall (st': state A) (env' envclos : sem_env val) (ebody : exp) (es : list exp) (n : varN) v vclos res,
       expListRevR st env es (st', Rval [vclos; v]) ->
       opapp vclos envclos n ebody ->
       env' = update_sev envclos (nsBind n v (sev envclos)) ->
       expR st' env' ebody res ->
       expR st env (EApp Opapp es) res
+
+  | expR_EAppPrimitive : forall (st' st'' : state A) (s' : store val) (ffi' : ffi_state A) (o : op) (es : list exp) (v : val) (vs : list val),
+      o <> Opapp -> (* redundant with [appR] but perhaps convenient in proofs *)
+      expListRevR st env es (st', Rval vs) ->
+      appR (refs st') (ffi st') o vs s' ffi' v ->
+      st'' = state_update_refs_and_ffi st' s' ffi' ->
+      expR st env (EApp o es) (st'', Rval v)
 
   | expR_ELogFst : forall (st' : state A) (op : lop) (e1 e2 : exp) (v1: val),
       expR st env e1 (st', Rval v1) ->
