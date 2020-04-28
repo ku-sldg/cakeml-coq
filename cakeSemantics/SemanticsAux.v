@@ -258,9 +258,7 @@ Definition lit_same_type (l1 l2 : lit) : bool :=
     | _, _ => false
   end.
 
-(* BACKPORT: rename to a more explicit name, eg stamp_same_type *)
-
-Definition same_type (s1 s2 : stamp) : bool :=
+Definition stamp_same_type (s1 s2 : stamp) : bool :=
   match s1, s2 with
   | TypeStamp _ n1, TypeStamp _ n2 => If n1 = n2 then true else false
   | ExnStamp _, ExnStamp _ => true
@@ -270,7 +268,7 @@ Definition same_type (s1 s2 : stamp) : bool :=
 Definition ctor_same_type (c1 c2 : option stamp) : bool :=
   match c1, c2 with
     | None, None => true
-    | Some stamp1, Some stamp2 => same_type stamp1 stamp2
+    | Some stamp1, Some stamp2 => stamp_same_type stamp1 stamp2
     | _, _ => false
 end.
 
