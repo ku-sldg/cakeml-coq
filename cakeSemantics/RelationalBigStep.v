@@ -228,43 +228,43 @@ Inductive opapp : val -> sem_env val -> varN -> exp -> Prop :=
     Note: for tuples and constructors, the assumption [length vs = length ps] is redundant
     with [patchlistR ... ps vs]  *)
 
-Inductive pmatchR : env_ctor -> store val -> pat -> val -> match_result (alist varN val) -> Prop :=
+Inductive pmatchR (cenv : env_ctor) : store val -> pat -> val -> match_result (alist varN val) -> Prop :=
 
-  | pmatchR_Pany : forall cenv (sto : store val) (v : val),
+  | pmatchR_Pany : forall (sto : store val) (v : val),
       pmatchR cenv sto Pany v (Match [])
 
-  | pmatchR_Pvar : forall cenv (sto : store val) (v : val) (x : varN),
+  | pmatchR_Pvar : forall (sto : store val) (v : val) (x : varN),
       pmatchR cenv sto (Pvar x) v (Match [(x,v)])
 
-  | pmatchR_Plit_yes : forall cenv (sto : store val) (l : lit),
+  | pmatchR_Plit_yes : forall (sto : store val) (l : lit),
       pmatchR cenv sto (Plit l) (Litv l) (Match [])
 
-  | pmatchR_Plit_no : forall cenv (sto : store val) (l1 l2 : lit),
+  | pmatchR_Plit_no : forall (sto : store val) (l1 l2 : lit),
       TypeCheck (lit_same_type l1 l2) ->
       l1 <> l2 ->
       pmatchR cenv sto (Plit l1) (Litv l2) No_match
 
-  | pmatchR_Ptuple : forall cenv (sto : store val) (ps : list pat) (vs : list val) m,
+  | pmatchR_Ptuple : forall (sto : store val) (ps : list pat) (vs : list val) m,
       pmatchListR cenv sto ps vs m ->
       pmatchR cenv sto (Pcon None ps) (Conv None vs) m
 
-  | pmatchR_PconYes : forall cenv (sto : store val) (n : ident modN conN) (nstamp : stamp) (ps : list pat) (vs : list val) m,
+  | pmatchR_PconYes : forall (sto : store val) (n : ident modN conN) (nstamp : stamp) (ps : list pat) (vs : list val) m,
       nsLookup n cenv = Some (length ps, nstamp) ->
       pmatchListR cenv sto ps vs m ->
       pmatchR cenv sto (Pcon (Some n) ps) (Conv (Some nstamp) vs) m
 
-  | pmatchR_PconNo : forall cenv (sto : store val) (n : ident modN conN) (nstamp1 nstamp2 : stamp) (ps : list pat) (vs : list val),
+  | pmatchR_PconNo : forall (sto : store val) (n : ident modN conN) (nstamp1 nstamp2 : stamp) (ps : list pat) (vs : list val),
       nsLookup n cenv = Some (length ps, nstamp2) ->
-      TypeCheck (same_type nstamp1 nstamp2) ->
+      TypeCheck (stamp_same_type nstamp1 nstamp2) ->
       nstamp1 <> nstamp2 ->
       pmatchR cenv sto (Pcon (Some n) ps) (Conv (Some nstamp1) vs) No_match
 
-  | pmatchR_Pref : forall cenv (sto : store val) (lnum : nat) (p : pat) (v : val) m,
+  | pmatchR_Pref : forall (sto : store val) (lnum : nat) (p : pat) (v : val) m,
      store_lookup lnum sto = Some (Refv v) ->
      pmatchR cenv sto p v m ->
      pmatchR cenv sto (Pref p) (Loc lnum) m
 
-  | pmatchR_Ptannot : forall cenv (sto : store val) (p : pat) (v : val) (t : ast_t) m,
+  | pmatchR_Ptannot : forall (sto : store val) (p : pat) (v : val) (t : ast_t) m,
       pmatchR cenv sto p v m ->
       pmatchR cenv sto (Ptannot p t) v m
 
@@ -273,18 +273,18 @@ Inductive pmatchR : env_ctor -> store val -> pat -> val -> match_result (alist v
     bindings [env_v].
     The predicate can only hold when [ps] and [vs] have the same length. *)
 
-with pmatchListR : env_ctor -> store val -> list pat -> list val -> match_result (alist varN val) -> Prop :=
+with pmatchListR (cenv: env_ctor) : store val -> list pat -> list val -> match_result (alist varN val) -> Prop :=
 
-  | pmatchListR_nil : forall cenv (sto : store val),
+  | pmatchListR_nil : forall (sto : store val),
       pmatchListR cenv sto [] [] (Match [])
 
-  | pmatchListR_cons_yes : forall cenv (sto : store val) (p : pat) (ps : list pat) (v : val) (vs : list val) env_v1 env_v2,
+  | pmatchListR_cons_yes : forall (sto : store val) (p : pat) (ps : list pat) (v : val) (vs : list val) env_v1 env_v2,
       pmatchR cenv sto p v (Match env_v1) ->
       pmatchListR cenv sto ps vs (Match env_v2) ->
       pmatchListR cenv sto (p::ps) (v::vs) (Match (env_v1 ++ env_v2))
       (* Note: the order of nsAppend should be irrelevant because pattern variables are unique. *)
 
-  | pmatchListR_cons_no : forall cenv (sto : store val) (p : pat) (ps : list pat) (v : val) (vs : list val) m,
+  | pmatchListR_cons_no : forall (sto : store val) (p : pat) (ps : list pat) (v : val) (vs : list val) m,
       pmatchR cenv sto p v No_match ->
       pmatchListR cenv sto ps vs m ->
       pmatchListR cenv sto (p::ps) (v::vs) No_match.
@@ -299,22 +299,39 @@ with pmatchListR : env_ctor -> store val -> list pat -> list val -> match_result
     This is an inductive version of [evaluate_match] from the Lem semantics, up to the fact that
     it does not perform the recursive call to evaluate directly, but instead returns the arguments
     to be provided for that call. *)
+(* Inductive matR : (A : Type) (st : state A) (env : sem_env val): val -> pat * exp -> option (alist varN val * exp) := *)
+(* | matR_yes : forall (v : val) (p : pat) (e : exp) env_v, *)
+(*     pmatchR (sec env) (refs st) p v (Match env_v) -> *)
+(*     matR st env v (p,e) (Some (env_v,e)) *)
 
-Inductive matR (A : Type) (st : state A) (env : sem_env val) : val -> list (pat * exp) -> option (alist varN val * exp) -> Prop :=
+(* | matR_no : forall (v : val) (p : pat) (e : exp), *)
+(*     pmatchR (sec env) (refs st) p v No_match -> *)
+(*     matR st env v (p,e) None *)
 
-   | matR_nil : forall (v : val),
-      matR st env v [] None
+(* with matRList (A : Type) (st : state A) (env : sem_env val) : val -> list (pat * exp) -> option (alist varN val * exp) -> Prop := *)
 
-   | matR_consYes : forall (v : val) (p : pat) (e : exp) (pes' : list (pat * exp)) env_v,
-       TypeCheck (UniquePatBindings p) ->
-       pmatchR (sec env) (refs st) p v (Match env_v) ->
-       matR st env v ((p,e)::pes') (Some (env_v,e))
+(*    | matRList_nil : forall (v : val), *)
+(*       matRList st env v [] None *)
 
-   | matR_consNo : forall (v : val) (p : pat) (e :exp) (pes' : list (pat * exp)) matchres,
+(*    | matRList_consYes : forall (v : val) (p : pat) (e : exp) (pes' : list (pat * exp)) env_v, *)
+(*        TypeCheck (UniquePatBindings p) -> *)
+(*        pmatchR (sec env) (refs st) p v (Match env) -> *)
+(*        matRList st env v ((p,e)::pes') (Some (env_v,e)). *)
+
+ Inductive matR (A : Type) (st : state A) (env : sem_env val) : val -> list (pat * exp) -> option (alist varN val * exp) -> Prop :=
+ | matR_nil : forall (v : val),
+     matR st env v [] None
+
+ | matR_consFail : forall (v : val) (p : pat) (e : exp) (pes' : list (pat * exp)),
        TypeCheck (UniquePatBindings p) ->
        pmatchR (sec env) (refs st) p v No_match ->
-       matR st env v pes' matchres ->
-       matR st env v ((p,e)::pes') matchres.
+       matR st env v (pes') None ->
+       matR st env v ((p,e)::pes') None
+
+ | matR_consSucc : forall (v : val) (p : pat) (e e' : exp) (pes' : list (pat * exp)) env_v,
+     TypeCheck (UniquePatBindings p) ->
+     (pmatchR (sec env) (refs st) p v (Match env_v) /\ e = e') \/ matR st env v pes' (Some (env_v,e')) ->
+     matR st env v ((p,e)::pes') (Some (env_v,e')).
 
 
 (* ********************************************************************** *)
@@ -381,7 +398,7 @@ Inductive expR (A : Type) (st : state A) (env : sem_env val) : exp -> (state A) 
       (v1 = Boolv false -> expR st' env e3 res) ->
       expR st env (EIf e1 e2 e3) res
 
-  | expR_EMatVal : forall (env' : sem_env val) (e : exp) (pes : list (pat * exp)) (v : val) st' env_v e_clause env' res,
+  | expR_EMatVal : forall (env' : sem_env val) (e : exp) (pes : list (pat * exp)) (v : val) st' env_v e_clause res,
       expR st env e (st', Rval v) ->
       matR st env v pes (Some (env_v, e_clause)) ->
       env' = update_sev env (nsAppend (alist_to_ns env_v) (sev env)) ->
@@ -485,8 +502,6 @@ with decListR (A : Type) (st : state A) (env : sem_env val) : list dec -> (state
   | ERaise_R  : forall (st': state A) (e : exp) (v :val),
       expR st env e (st', Rval v) ->
       expR st env (ERaise e) (st', Rerr (Rraise v))
-
-  | EHandleCatch_R : forall (st' st'': state A) (e : exp) (l : list (pat * exp)) (err_v : val) (r : result val val),
       expR st env e (st', Rerr (Rraise err_v)) ->
       matR st' env err_v l err_v (st'', r) ->
       expR st env (EHandle e l) (st'', r)
