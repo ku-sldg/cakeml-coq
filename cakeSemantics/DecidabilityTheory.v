@@ -1,11 +1,13 @@
 Require Import String.
 Require Import ZArith.
 Require Import List.
+Import ListNotations.
 
 Require Import Word.
 Require Import Utils.
 Require Import Namespace.
 Require Import CakeAST.
+Require Import SemanticsAux.
 
 
 
@@ -176,3 +178,80 @@ Proof.
       * destruct (p d); destruct (IHX l0); subst; try (right; injection; auto); left; reflexivity.
 Qed.
 Hint Resolve dec_eq_dec : DecidableEquality.
+
+(* SemanticsAux constructors *)
+Theorem stamp_eq_dec : forall (s0 s1 : stamp), {s0 = s1} + {s0 <> s1}.
+Proof.
+  decide equality; auto with DecidableEquality.
+Qed.
+Hint Resolve stamp_eq_dec : DecidableEquality.
+
+Theorem val_eq_dec : forall (v0 v1 : val), {v0 = v1} + {v0 <> v1}.
+Proof.
+  decide equality; auto with DecidableEquality.
+  - generalize dependent l0. induction l; destruct l0; try (left; reflexivity); try (right; discriminate).
+    inversion X; subst; clear X. destruct (X0 v); destruct (IHl X1 l0); subst; try (right; discriminate); try (left; reflexivity).
+    right; injection; assumption.
+    right; injection; assumption.
+    right; injection. intro. assumption.
+  - generalize dependent s0. induction s; destruct s0.
+
+    assert (pair_nat_stamp_dec : forall (p p0: (nat * stamp)), {p = p0} + {p <> p0})
+      by (decide equality; auto with DecidableEquality).
+    destruct (namespace_eq_dec modN conN (nat * stamp) String.string_dec String.string_dec
+                               pair_nat_stamp_dec sec sec0); subst.
+
+    simpl in X.
+    generalize dependent sev0.
+    induction X; destruct sev0; try (left; reflexivity); try (right; discriminate).
+    destruct x; destruct p0.
+    destruct (ident_eq_dec modN varN i i0); try (apply String.string_dec); subst.
+    destruct (p v3); subst.
+    simpl in *.
+    destruct (IHX sev0).
+    inversion e1.
+    left; reflexivity.
+    right; intro con; inversion con. apply n0. rewrite H0. reflexivity.
+    right; intro con; inversion con; auto.
+    right; intro con; inversion con; auto.
+    right; intro con; inversion con; auto.
+  - generalize dependent s0. induction s; destruct s0.
+
+    assert (pair_nat_stamp_dec : forall (p p0: (nat * stamp)), {p = p0} + {p <> p0})
+      by (decide equality; auto with DecidableEquality).
+    destruct (namespace_eq_dec modN conN (nat * stamp) String.string_dec String.string_dec
+                               pair_nat_stamp_dec sec sec0); subst.
+
+    simpl in X.
+    generalize dependent sev0.
+    induction X; destruct sev0; try (left; reflexivity); try (right; discriminate).
+    destruct x; destruct p0.
+    destruct (ident_eq_dec modN varN i i0); try (apply String.string_dec); subst.
+    destruct (p v3); subst.
+    simpl in *.
+    destruct (IHX sev0).
+    inversion e.
+    left; reflexivity.
+    right; intro con; inversion con. apply n0. rewrite H0. reflexivity.
+    right; intro con; inversion con; auto.
+    right; intro con; inversion con; auto.
+    right; intro con; inversion con; auto.
+  - generalize dependent l0. induction l; destruct l0; try (left; reflexivity); try (right; discriminate).
+    inversion X; subst; clear X. destruct (X0 v); destruct (IHl X1 l0); subst; try (right; discriminate); try (left; reflexivity).
+    right; injection; assumption.
+    right; injection; assumption.
+    right; injection. intro. assumption.
+Qed.
+
+Theorem NoDup_dec : forall (A : Type) (l : list A),
+    (forall (x y : A), {x = y} + {x <> y}) -> {NoDup l} + {~ NoDup l}.
+Proof.
+  intros A l H.
+  induction l.
+  - left; constructor.
+  - destruct (in_dec H a l).
+    right. intro contra. inversion contra; subst. apply (H2 i).
+    destruct IHl.
+    left; constructor; assumption.
+    right. intro contra. inversion contra; subst. apply (n0 H3).
+Qed.
