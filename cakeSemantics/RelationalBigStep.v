@@ -161,14 +161,14 @@ Inductive appR (FFI : Type) (s : store val) (t : ffi_state FFI) : op -> list val
 
   | appR_Asub : forall lnum i vs v i',
       store_lookup lnum s = Some (Varray vs) ->
-      (0 <= i < List.length vs)%Z ->
+      (0 <= i < Zlength vs) ->
       i = Z.of_nat i' ->
       v = LibList.nth i' vs ->
       appR s t Asub [Loc lnum; Litv (IntLit i)] s t v
 
   | appR_Aupdate : forall lnum i n (vs:list val) s' v i',
       store_lookup n s = Some (Varray vs) ->
-      (0 <= i < List.length vs)%Z ->
+      (0 <= i < Zlength vs)%Z ->
       i = Z.of_nat i' ->
       s' = store_assign_nocheck lnum (Varray (LibList.update i' v vs)) s ->
       appR s t Aupdate [Loc lnum; Litv (IntLit i); v] s' t ConvUnit.

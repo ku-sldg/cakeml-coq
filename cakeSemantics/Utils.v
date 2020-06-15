@@ -1,29 +1,25 @@
+Require Export String.
+Require Export Coq.Lists.List.
+Export ListNotations.
+Require Export ZArith.BinInt.
+Require Import Coq.Arith.PeanoNat.
+Require Coq.Strings.Ascii.
 
-From TLC Require Export LibString. (* almost same as [Export String] *)
-From TLC Require Export LibInt. (* exports type [int] *)
-From TLC Require Export LibList.
+(* From TLC Require Export LibString. (* almost same as [Export String] *) *)
+(* From TLC Require Export LibInt. (* exports type [int] *) *)
+(* From TLC Require Export LibList. *)
 
 Require Export TLCbuffer. (* For local extensions to TLC *)
 
-Export LibList_Notation. (* Notations [] and [x] and [x;y] *)
+(* Export LibList_Notation. (* Notations [] and [x] and [x;y] *) *)
 
-Require Ascii. (* To define type [char] *)
+(* Require Ascii. (* To define type [char] *) *)
 
 Require Export CakeSem.Word.
 
-
-(*****************************************************************************)
-
-(** Comparison for strings -- TODO: will be removed later *)
-
-Require Import Classes.EquivDec.
-Instance string_equiv_dec : EqDec string eq := string_dec.
-
-
-(*****************************************************************************)
-
 (** Abbreviation for types *)
 
+Definition int := Z.
 Definition char := Ascii.ascii.
 Definition word8 := word 8.
 Definition word64 := word 64.
@@ -60,4 +56,55 @@ Fixpoint list_char_to_string (ls : list char) : string :=
 (** Conversion between [string] and [list word8] *)
 
 Definition list_word8_to_string (ls : list word8) : string :=
-  list_char_to_string (LibList.map word8_to_char ls).
+  list_char_to_string (List.map word8_to_char ls).
+
+(** List update function *)
+Fixpoint update {X : Type} (n : nat) (e : X) (l : list X) : list X :=
+  match l with
+  | [] => []
+  | x::l' => match n with
+           | O => e::l'
+           | S n' => x::(update n' e l')
+           end
+  end.
+
+(** DecidableEquality Hint DB to be used by subsequent theories *)
+Create HintDb DecidableEquality.
+Hint Resolve string_dec : DecidableEquality.
+Hint Resolve Ascii.ascii_dec : DecidableEquality.
+Hint Resolve (word_eq_dec 8) : DecidableEquality.
+Hint Resolve (word_eq_dec 64) : DecidableEquality.
+Hint Resolve Z.eq_dec : DecidableEquality.
+Hint Resolve list_eq_dec : DecidableEquality.
+Hint Resolve Peano_dec.eq_nat_dec : DecidableEquality.
+
+Ltac inv H := inversion H; subst; clear H.
+
+Theorem option_eq_dec : forall (X : Type), (forall (x y : X), {x = y} + {x <> y})
+                                      -> (forall (xo yo : option X), {xo = yo} + {xo <> yo}).
+Proof.
+  decide equality.
+Defined.
+Hint Resolve option_eq_dec : DecidableEquality.
+
+Theorem pair_eq_dec : forall (X Y: Type),
+    (forall (x0 y0 : X), {x0 = y0} + {x0 <> y0}) ->
+    (forall (x1 y1 : Y), {x1 = y1} + {x1 <> y1}) ->
+    (forall (xp yp : X * Y), {xp = yp} + {xp <> yp}).
+Proof.
+  decide equality.
+Defined.
+Hint Resolve pair_eq_dec : DecidableEquality.
+
+Theorem NoDuplicates_dec {A : Type} :
+    (forall (x y : A), {x = y} + {x <> y}) -> forall (l : list A), {NoDup l} + {~ NoDup l}.
+Proof.
+  intros H l.
+  induction l.
+  - left; constructor.
+  - destruct (in_dec H a l).
+    right. intro contra. inversion contra; subst. apply (H2 i).
+    destruct IHl.
+    left; constructor; assumption.
+    right. intro contra. inversion contra; subst. apply (n0 H3).
+Defined.

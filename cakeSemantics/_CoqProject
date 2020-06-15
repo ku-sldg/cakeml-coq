@@ -1,12 +1,12 @@
 -R . CakeSem
-ffi/FFI.v
-ffi/SimpleIO.v
 TLCbuffer.v
 Word.v
-Namespace.v
-NamespaceTheory.v
 Utils.v
+ffi/FFI.v
+ffi/SimpleIO.v
+Namespace.v
 CakeAST.v
-DecidabilityTheory.v
+FreeVars.v
 SemanticsAux.v
+Evaluate.v
 RelationalBigStep.v

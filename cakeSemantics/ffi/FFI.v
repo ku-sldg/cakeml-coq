@@ -25,7 +25,7 @@ Inductive io_event : Type :=
 Inductive final_event : Type :=
   | Final_event : string -> list word8 -> list word8 -> ffi_outcome -> final_event.
 
-Definition ffi_state (ffi' : Type) : Type := 
+Definition ffi_state (ffi' : Type) : Type :=
   (((oracle ffi') * ffi') * (list io_event))%type.
 
 Definition initial_ffi_state {ffi' : Type} (oc : oracle ffi') (ffi : ffi') : ffi_state ffi' :=
@@ -71,7 +71,7 @@ Definition traceOracle
            (conf : list word8)
            (input : list word8) : oracle_result (list io_event) :=
   match List.head io_trace with
-  | Some (Io_event s' conf' bytes2) => 
+  | Some (Io_event s' conf' bytes2) =>
       If s = s' /\ map fst bytes2 = input
          then Oracle_return (list io_event) (List.tail io_trace) (map snd bytes2)
          else Oracle_final (list io_event) Ffi_failed

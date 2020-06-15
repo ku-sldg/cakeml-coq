@@ -4,7 +4,6 @@ From TLC Require Import LibLogic LibReflect.
 Require Import Arith.
 Require Import Ascii.
 Import Bool.Sumbool.
-Require Strings.String.
 Require Import List.
 Import ListNotations.
 
@@ -16,6 +15,7 @@ Require Import CakeSem.ffi.FFI.
 Require Import CakeSem.Utils.
 Require Import CakeSem.Namespace.
 Require Import CakeSem.CakeAST.
+Require Import CakeSem.FreeVars.
 
 Open Scope string_scope.
 Open Scope list_scope.
@@ -74,6 +74,15 @@ Definition extend_dec_env (V : Type) (new_env env : sem_env V) : sem_env V :=
   {| sev := nsAppend (sev new_env) (sev env);
      sec := nsAppend (sec new_env) (sec env)|}.
 
+Fixpoint optimize_sem_env {V : Type} (env : sem_env V) (fvs : list (ident modN varN)) : sem_env V :=
+  match fvs with
+    | [] => {| sec := sec env; sev := nsEmpty|}
+    | id::fvs' => let opt := optimize_sem_env env fvs' in
+                match nsLookup id (sev env) with
+                | None => opt
+                | Some v => {| sec := sec opt; sev := (id,v)::(sev opt) |}
+                end
+  end.
 
 (* ---------------------------------------------------------------------- *)
 (** ** Values *)
@@ -101,6 +110,7 @@ Definition is_closure (v:val) : Prop :=
   | Recclosure _ _ _ => True
   | _ => False
   end.
+
 
 
 (* ---------------------------------------------------------------------- *)
@@ -151,6 +161,13 @@ Inductive result (A : Type) (B : Type) : Type :=
 Arguments Rval {A} {B}.
 Arguments Rerr {A} {B}.
 
+
+Definition combine_dec_result {A : Type} (env : sem_env val) (r : result (sem_env val) A) :
+  result (sem_env val) A :=
+  match r with
+  | Rerr err => r
+  | Rval env' =>  Rval (extend_dec_env env' env)
+  end.
 
 (* ---------------------------------------------------------------------- *)
 (** ** Store *)
@@ -293,10 +310,10 @@ Definition store_lookup {A : Type} (n : nat) (st : store A) :=
   List.nth_error st n.
 
 Definition store_alloc {A : Type} (v : store_v A) (st : store A) : (store A * nat) :=
-  (st ++ [v], length st).
+  (st ++ [v], List.length st).
 
 Definition store_assign_nocheck {A : Type} (n : nat) (v : store_v A) (st : store A) : store A :=
-  LibList.update n v st.
+  Utils.update n v st.
 
 
 (* ---------------------------------------------------------------------- *)
@@ -396,9 +413,15 @@ Parameter shift64_lookup : forall (op : CakeAST.shift), word64 -> nat -> word64.
 
 Open Scope bool_scope.
 Open Scope nat_scope.
+Definition UniqueCtorsInDef (td : list tvarN * typeN * list (conN * list ast_t)) : Prop :=
+  let '(tvs,tn,condefs) := td in
+  NoDup (List.map (fun '(n,_) => n) condefs).
+
+Definition UniqueCtorsInDefs (tds : typeDef) : Prop :=
+  List.Forall UniqueCtorsInDef tds.
 
 Definition build_constrs (s : nat) (condefs : list (conN * (list ast_t)) ) :=
-  List.map (fun '(conN,ts) => (conN,(length ts, TypeStamp conN s))) condefs.
+  List.map (fun '(conN,ts) => (conN,(List.length ts, TypeStamp conN s))) condefs.
 
 Fixpoint build_tdefs (next_stamp : nat) (tds : list (list tvarN * typeN * list (conN * list ast_t))) : env_ctor :=
   match tds with
@@ -536,3 +559,82 @@ Fixpoint val_rect (P : val -> Type)
 
 Definition val_ind (P : val -> Prop) := @val_rect P.
 Definition val_rec (P : val -> Set) := @val_rect P.
+
+(** Decidability theorems *)
+Theorem stamp_eq_dec : forall (s0 s1 : stamp), {s0 = s1} + {s0 <> s1}.
+Proof.
+  decide equality; auto with DecidableEquality.
+Defined.
+Hint Resolve stamp_eq_dec : DecidableEquality.
+
+Theorem val_eq_dec : forall (v0 v1 : val), {v0 = v1} + {v0 <> v1}.
+Proof.
+  decide equality; auto with DecidableEquality.
+  - generalize dependent l0. induction l; destruct l0; try (left; reflexivity); try (right; discriminate).
+    inversion X; subst; clear X. destruct (X0 v); destruct (IHl X1 l0); subst; try (right; discriminate); try (left; reflexivity).
+    right; injection; assumption.
+    right; injection; assumption.
+    right; injection. intro. assumption.
+  - generalize dependent s0. induction s; destruct s0.
+
+    assert (pair_nat_stamp_dec : forall (p p0: (nat * stamp)), {p = p0} + {p <> p0})
+      by (decide equality; auto with DecidableEquality).
+    destruct (namespace_eq_dec modN conN (nat * stamp) String.string_dec String.string_dec
+                               pair_nat_stamp_dec sec0 sec1); subst.
+
+    generalize dependent sev1.
+    simpl in X.
+    induction X; destruct sev1; try (left; reflexivity); try (right; discriminate).
+    destruct x; destruct p0.
+    destruct (ident_eq_dec modN varN string_dec string_dec i i0); subst.
+    destruct (p v3); subst.
+    simpl in *.
+    destruct (IHX sev1).
+    inversion e1.
+    left; reflexivity.
+    right; intro con; inversion con. apply n0. rewrite H0. reflexivity.
+    right; intro con; inversion con; auto.
+    right; intro con; inversion con; auto.
+    right; intro con; inversion con; auto.
+  - generalize dependent s0. induction s; destruct s0.
+
+    assert (pair_nat_stamp_dec : forall (p p0: (nat * stamp)), {p = p0} + {p <> p0})
+      by (decide equality; auto with DecidableEquality).
+    destruct (namespace_eq_dec modN conN (nat * stamp) String.string_dec String.string_dec
+                               pair_nat_stamp_dec sec0 sec1); subst.
+
+    simpl in X.
+    generalize dependent sev1.
+    induction X; destruct sev1; try (left; reflexivity); try (right; discriminate).
+    destruct x; destruct p0.
+    destruct (ident_eq_dec modN varN string_dec string_dec i i0); subst.
+    destruct (p v3); subst.
+    simpl in *.
+    destruct (IHX sev1).
+    inversion e.
+    left; reflexivity.
+    right; intro con; inversion con. apply n0. rewrite H0. reflexivity.
+    right; intro con; inversion con; auto.
+    right; intro con; inversion con; auto.
+    right; intro con; inversion con; auto.
+  - generalize dependent l0. induction l; destruct l0; try (left; reflexivity); try (right; discriminate).
+    inversion X; subst; clear X. destruct (X0 v); destruct (IHl X1 l0); subst; try (right; discriminate); try (left; reflexivity).
+    right; injection; assumption.
+    right; injection; assumption.
+    right; injection. intro. assumption.
+Defined.
+
+Lemma UniqueCtorsInDef_dec : forall (td : (list tvarN * typeN * list (conN * list ast_t))),
+    {UniqueCtorsInDef td} + {~ UniqueCtorsInDef td}.
+Proof.
+  unfold UniqueCtorsInDef. intro td.
+  destruct td. destruct p.
+  apply NoDuplicates_dec.
+  auto with DecidableEquality.
+Defined.
+
+Theorem UniqueCtorsInDefs_dec : forall (tds : typeDef), {UniqueCtorsInDefs tds} + {~ UniqueCtorsInDefs tds}.
+Proof.
+  apply Forall_dec.
+  apply UniqueCtorsInDef_dec.
+Defined.
