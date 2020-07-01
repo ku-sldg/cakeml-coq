@@ -76,9 +76,9 @@ Definition extend_dec_env (V : Type) (new_env env : sem_env V) : sem_env V :=
 
 Fixpoint optimize_sem_env {V : Type} (env : sem_env V) (fvs : list (ident modN varN)) : sem_env V :=
   match fvs with
-    | [] => {| sec := sec env; sev := nsEmpty|}
+    | [] => {| sec := sec env; sev := nsEmpty |}
     | id::fvs' => let opt := optimize_sem_env env fvs' in
-                match nsLookup id (sev env) with
+                match nsLookupd id (sev env) (ident_eq_dec _ _ string_dec string_dec) with
                 | None => opt
                 | Some v => {| sec := sec opt; sev := (id,v)::(sev opt) |}
                 end
@@ -331,15 +331,15 @@ Inductive con_build (cenv : env_ctor) : constr_id -> option stamp -> Prop :=
 
 (* ---------------------------------------------------------------------- *)
 (** ** Operations for functions *)
-
+(* test thing: cl_env -> (optimize_sem_env cl_env (free_vars e)) *)
 Definition build_rec_env (funs : list (varN * varN * exp)) (cl_env : sem_env val)
            (add_to_env : env_val) : env_val :=
-  fold_right (fun '(f,x,e) env' => nsBind f (Recclosure cl_env funs f) env') add_to_env funs.
+  fold_right (fun '(f,x,e) env' => nsBind f (Recclosure (optimize_sem_env cl_env (free_vars e)) funs f) env') add_to_env funs.
 
 Fixpoint find_recfun {A B : Type} (n : varN) (funs : list (varN * A * B)) : option (A * B) :=
   match funs with
   | [] => None
-  | (f,x,e)::funs' => If f = n then Some (x,e) else find_recfun n funs'
+  | (f,x,e)::funs' => if string_dec f n then Some (x,e) else find_recfun n funs'
   end.
 
 

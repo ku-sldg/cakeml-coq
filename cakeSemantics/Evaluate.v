@@ -176,6 +176,8 @@ Fixpoint do_eq (e1 e2 : val) : eq_result :=
    the first one should be [nfun], the second one [narg] or just [n], but
    named in a consistant way with the non-recursive closure case. *)
 (* LATER: not needed in the relational bigstep *)
+
+
 Fixpoint do_opapp (vs : list val) : option (sem_env val * exp) :=
   match vs with
   | (Closure env n e)::v::[] =>
@@ -524,7 +526,6 @@ Definition list_result {A B : Type} (res : result A B) : result (list A) B :=
   | Rerr e => Rerr e
   end.
 
-
 Fixpoint evaluate (fuel : nat) {ffi' : Type} (st : state ffi') (env : sem_env val)
          (es : list exp) : state ffi' * result (list val) val :=
   match fuel with
@@ -575,10 +576,7 @@ Fixpoint evaluate (fuel : nat) {ffi' : Type} (st : state ffi') (env : sem_env va
         | EApp op es => match (evaluate fuel' st env (rev es)) with
                        | (st', Rval vs) => if op_eq_dec op Opapp
                                           then match do_opapp (rev vs) with
-                                               | Some (env', e) =>
-                                                 if eq_nat_dec (clock st') 0
-                                                 then (st', Rerr (Rabort Rtimeout_error))
-                                                 else evaluate fuel' st' env' [e]
+                                               | Some (env', e) => evaluate fuel' st' env' [e]
                                                | None => (st', Rerr (Rabort Rtype_error))
                                                end
                                           else match do_app _ (refs st', ffi st') op (rev vs) with
@@ -644,6 +642,12 @@ Fixpoint evaluate (fuel : nat) {ffi' : Type} (st : state ffi') (env : sem_env va
     end
   end.
 
+Fixpoint identity_to_string (i : ident modN varN) : string :=
+  match i with
+  | Short n => n
+  | Long m i' => m ++ (identity_to_string i')
+  end.
+
 Fixpoint evaluate_opt (fuel : nat) {ffi' : Type} (st : state ffi') (env : sem_env val)
          (es : list exp) : state ffi' * result (list val) val :=
   match fuel with
@@ -691,25 +695,23 @@ Fixpoint evaluate_opt (fuel : nat) {ffi' : Type} (st : state ffi') (env : sem_en
                    end
         | EFun x e => (st, Rval [Closure (optimize_sem_env env (free_vars e)) x e])
 
-        | EApp op es => match (evaluate_opt fuel' st env (rev es)) with
-                       | (st', Rval vs) => if op_eq_dec op Opapp
-                                          then match do_opapp (rev vs) with
-                                               | Some (env', e) =>
-                                                 if eq_nat_dec (clock st') 0
-                                                 then (st', Rerr (Rabort Rtimeout_error))
-                                                 else evaluate_opt fuel' st' env' [e]
-                                               | None => (st', Rerr (Rabort Rtype_error))
-                                               end
-                                          else match do_app _ (refs st', ffi st') op (rev vs) with
-                                               | Some ((refs, ffi), r) => ({| refs := refs;
-                                                                             ffi  := ffi;
-                                                                             clock := clock st';
-                                                                             next_type_stamp := next_type_stamp st' ;
-                                                                             next_exn_stamp := next_exn_stamp st'
-                                                                          |},
-                                                                          list_result r)
-                                               | None => (st', Rerr (Rabort Rtype_error))
-                                               end
+        | EApp op es => match evaluate_opt fuel' st env (rev es) with
+                       | (st', Rval vs) =>
+                         if op_eq_dec op Opapp
+                         then match do_opapp (rev vs) with
+                              | Some (env', e) => evaluate_opt fuel' st' env' [e]
+                              | None => (st', Rerr (Rabort Rtype_error))
+                              end
+                         else match do_app _ (refs st', ffi st') op (rev vs) with
+                              | Some ((refs, ffi), r) => ({| refs := refs;
+                                                            ffi  := ffi;
+                                                            clock := clock st';
+                                                            next_type_stamp := next_type_stamp st' ;
+                                                            next_exn_stamp := next_exn_stamp st'
+                                                         |},
+                                                         list_result r)
+                              | None => (st', Rerr (Rabort Rtype_error))
+                              end
                        | res => res
                        end
 
@@ -772,7 +774,7 @@ Fixpoint evaluate_decs {ffi' : Type} (fuel : nat) (st : state ffi') (env : sem_e
     | [] => (st, Rval empty_sem_env)
     | d1::d2::decl' => match evaluate_decs fuel' st env [d1] with
                     | (st1, Rval env1) =>
-                      match evaluate_decs fuel' st (extend_dec_env env1 env) (d2::decl') with
+                      match evaluate_decs fuel' st1 (extend_dec_env env1 env) (d2::decl') with
                       | (st2, r) => (st2, combine_dec_result env1 r)
                       end
                     | res => res
@@ -781,7 +783,7 @@ Fixpoint evaluate_decs {ffi' : Type} (fuel : nat) (st : state ffi') (env : sem_e
 
     | [Dlet locs p e] =>
       if NoDuplicates_dec string_dec (pat_bindings p)
-      then match evaluate fuel st env [e] with
+      then match evaluate_opt fuel st env [e] with
            | (st', Rval v) =>
              (st', match pmatch (sec env) (refs st') p (hd (Litv (StrLit "IF HERE THEN BAD")) v) [] with
                    | Match new_vals => Rval {| sec := nsEmpty; sev := alist_to_ns new_vals |}
@@ -799,25 +801,25 @@ Fixpoint evaluate_decs {ffi' : Type} (fuel : nat) (st : state ffi') (env : sem_e
 
     | [Dtype locs tds] => if UniqueCtorsInDefs_dec tds
                          then (state_update_next_type_stamp st (next_type_stamp st + List.length tds),
-                              Rval {| sev := nsEmpty; sec := build_tdefs (next_type_stamp st) tds |})
+                               Rval {| sev := nsEmpty; sec := build_tdefs (next_type_stamp st) tds |})
                          else (st, Rerr (Rabort Rtype_error))
-  | [Dtabbrev locs tvs tn t] => (st, Rval {| sev := nsEmpty; sec := nsEmpty |})
-  | [Dexn locs cn ts] => (state_update_next_exn_stamp st (next_exn_stamp st + 1),
-                         Rval {| sev := nsEmpty;
-                                 sec := nsSing cn (List.length ts, ExnStamp (next_exn_stamp st)) |})
-  | [Dmod mn ds] => match evaluate_decs fuel' st env ds with
-                   | (st', r) => (st',
-                                 match r with
-                                 | Rval env' => Rval {| sev := nsLift mn (sev env');
-                                                       sec := nsLift mn (sec env') |}
-                                 | Rerr err => Rerr err
-                                 end)
-                   end
-  | [Dlocal lds ds] => match evaluate_decs fuel' st env lds with
-                      | (st1, Rval env1) =>
-                        evaluate_decs fuel' st1 (extend_dec_env env1 env) ds
-                      | res => res
-                      end
+    | [Dtabbrev locs tvs tn t] => (st, Rval {| sev := nsEmpty; sec := nsEmpty |})
+    | [Dexn locs cn ts] => (state_update_next_exn_stamp st (next_exn_stamp st + 1),
+                           Rval {| sev := nsEmpty;
+                                   sec := nsSing cn (List.length ts, ExnStamp (next_exn_stamp st)) |})
+    | [Dmod mn ds] => match evaluate_decs fuel' st env ds with
+                     | (st', r) => (st',
+                                   match r with
+                                   | Rval env' => Rval {| sev := nsLift mn (sev env');
+                                                         sec := nsLift mn (sec env') |}
+                                   | Rerr err => Rerr err
+                                   end)
+                     end
+    | [Dlocal lds ds] => match evaluate_decs fuel' st env lds with
+                        | (st1, Rval env1) =>
+                          evaluate_decs fuel' st1 (extend_dec_env env1 env) ds
+                        | res => res
+                        end
     end
   end.
 
