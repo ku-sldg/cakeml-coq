@@ -1,5 +1,4 @@
 -R . CakeSem
-TLCbuffer.v
 Word.v
 Utils.v
 ffi/FFI.v
@@ -9,4 +8,3 @@ CakeAST.v
 FreeVars.v
 SemanticsAux.v
 Evaluate.v
-RelationalBigStep.v

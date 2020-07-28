@@ -42,8 +42,7 @@ Definition noBasisProg' := evaluate_decs 19 init_state init_env [ dec_def_0
                                                                 ; dec_def_8
                                                                 ; dec_def_9
                                                                 ].
-(* This takes a long time but will eventually terminate *)
-(* Eval cbv in noBasisProg. *)
+Eval cbv in noBasisProg.
 
 Definition my_env :=   {|
          sev := [(Short "answer",
