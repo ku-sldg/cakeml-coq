@@ -1,4 +1,3 @@
-From TLC Require Import LibLogic.
 Require Import Coq.Lists.List.
 Require Import Arith.Peano_dec.
 Import ListNotations.
@@ -15,8 +14,8 @@ Definition isEof
            (input : list word8) : oracle_result simpleIO :=
   match input with
   | [] => Oracle_final simpleIO Ffi_failed
-  | x :: xs => 
-      let x' := nat_to_word 8 (If fst st = [] then 1%nat else 0%nat) in
+  | x :: xs =>
+      let x' := nat_to_word 8 (if list_eq_dec (word_eq_dec 8) (fst st) [] then 1%nat else 0%nat) in
       Oracle_return simpleIO st (x'::xs)
   end.
 
@@ -46,13 +45,13 @@ Definition exit (st : simpleIO) (conf : list word8) (input : list word8) : oracl
 
 Definition simpleIO_oracle (s : string) (st : simpleIO)
            (conf : list word8) (input : list word8) : oracle_result simpleIO :=
-  If s = "isEof"
+  if string_dec s "isEof"
     then isEof st conf input
-  else If s = "getChar"
+  else if string_dec s "getChar"
     then getChar st conf input
-  else If s = "putChar"
+  else if string_dec s "putChar"
     then putChar st conf input
-  else If s = "exit"
+  else if string_dec s "exit"
     then exit st conf input
   else
     Oracle_final simpleIO Ffi_failed.

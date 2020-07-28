@@ -5,16 +5,6 @@ Require Export ZArith.BinInt.
 Require Import Coq.Arith.PeanoNat.
 Require Coq.Strings.Ascii.
 
-(* From TLC Require Export LibString. (* almost same as [Export String] *) *)
-(* From TLC Require Export LibInt. (* exports type [int] *) *)
-(* From TLC Require Export LibList. *)
-
-Require Export TLCbuffer. (* For local extensions to TLC *)
-
-(* Export LibList_Notation. (* Notations [] and [x] and [x;y] *) *)
-
-(* Require Ascii. (* To define type [char] *) *)
-
 Require Export CakeSem.Word.
 
 (** Abbreviation for types *)

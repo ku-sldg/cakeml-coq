@@ -1,5 +1,4 @@
 Set Implicit Arguments.
-From TLC Require Import LibLogic LibReflect.
 
 Require Import Arith.
 Require Import Ascii.
@@ -33,6 +32,11 @@ Inductive stamp : Type :=
   | TypeStamp : conN -> nat -> stamp
   | ExnStamp : nat -> stamp.
 
+Theorem stamp_eq_dec : forall (s0 s1 : stamp), {s0 = s1} + {s0 <> s1}.
+Proof.
+  decide equality; auto with DecidableEquality.
+Defined.
+Hint Resolve stamp_eq_dec : DecidableEquality.
 (* LATER : add type annotations? *)
 
 Definition bind_stamp := ExnStamp 0.
@@ -78,7 +82,7 @@ Fixpoint optimize_sem_env {V : Type} (env : sem_env V) (fvs : list (ident modN v
   match fvs with
     | [] => {| sec := sec env; sev := nsEmpty |}
     | id::fvs' => let opt := optimize_sem_env env fvs' in
-                match nsLookupd id (sev env) (ident_eq_dec _ _ string_dec string_dec) with
+                match nsLookup (ident_eq_dec _ _ string_dec string_dec) id (sev env) with
                 | None => opt
                 | Some v => {| sec := sec opt; sev := (id,v)::(sev opt) |}
                 end
@@ -96,9 +100,6 @@ Inductive val : Type :=
   | Recclosure : sem_env val -> list (varN * varN * exp) -> varN -> val
   | Loc : nat -> val
   | Vectorv : list val -> val.
-
-Instance Inhab_val : Inhab val.
-Proof using. apply (Inhab_of_val (Loc 0%nat)). Qed.
 
 Definition env_val := namespace modN varN val.
 
@@ -133,9 +134,8 @@ Definition ConvUnit := Conv None [].
 Definition Boolv (b : bool) : val :=
   if b then ConvTrue  else ConvFalse.
 
-Definition Propv (P:Prop) : val :=
-  Boolv (isTrue P).
-
+(* Definition Propv (P:Prop) : val := *)
+(*   Boolv (isTrue P). *)
 
 (* ---------------------------------------------------------------------- *)
 (** ** Result of an evaluation *)
@@ -277,7 +277,7 @@ Definition lit_same_type (l1 l2 : lit) : bool :=
 
 Definition stamp_same_type (s1 s2 : stamp) : bool :=
   match s1, s2 with
-  | TypeStamp _ n1, TypeStamp _ n2 => If n1 = n2 then true else false
+  | TypeStamp _ n1, TypeStamp _ n2 => if Peano_dec.eq_nat_dec n1 n2 then true else false
   | ExnStamp _, ExnStamp _ => true
   | _, _ => false
   end.
@@ -297,7 +297,7 @@ Inductive con_check (cenv : env_ctor) : constr_id -> nat -> Prop :=
   | con_check_none : forall l,
       con_check cenv None l
   | con_check_some : forall n l s,
-      nsLookup n cenv = Some (l,s) ->
+      nsLookup (ident_eq_dec _ _ string_dec string_dec) n cenv = Some (l,s) ->
       con_check cenv (Some n) l.
 
 
@@ -326,7 +326,7 @@ Inductive con_build (cenv : env_ctor) : constr_id -> option stamp -> Prop :=
   | con_build_none :
       con_build cenv None None
   | con_build_some : forall n l s,
-      nsLookup n cenv = Some (l,s) ->
+      nsLookup (ident_eq_dec _ _ string_dec string_dec) n cenv = Some (l,s) ->
       con_build cenv (Some n) (Some s).
 
 (* ---------------------------------------------------------------------- *)
@@ -438,10 +438,10 @@ Fixpoint build_tdefs (next_stamp : nat) (tds : list (list tvarN * typeN * list (
 
 Fixpoint val_to_list (v : val) : option (list val) :=
   match v with
-  | Conv (Some stamp) [] => If (stamp = TypeStamp "[]" list_type_num)
+  | Conv (Some stamp) [] => if stamp_eq_dec stamp (TypeStamp "[]" list_type_num)
                            then Some []
                            else None
-  | Conv (Some stamp) [v1;v2] => If (stamp = TypeStamp "::" list_type_num)
+  | Conv (Some stamp) [v1;v2] => if stamp_eq_dec stamp (TypeStamp "::" list_type_num)
                                 then match val_to_list v2 with
                                      | Some vs => Some (v1::vs)
                                      | None => None
@@ -458,11 +458,11 @@ Fixpoint list_to_val (vs : list val) : val :=
 
 Fixpoint val_to_char_list (v : val) : option (list char) :=
   match v with
-  | Conv (Some stamp) [] => If (stamp = TypeStamp "[]" list_type_num)
+  | Conv (Some stamp) [] => if stamp_eq_dec stamp (TypeStamp "[]" list_type_num)
                            then Some []
                            else None
   | Conv (Some stamp) [Litv (CharLit c); v'] =>
-    If (stamp = TypeStamp "::" list_type_num)
+    if stamp_eq_dec stamp (TypeStamp "::" list_type_num)
     then match val_to_char_list v' with
          | Some cs => Some (c::cs)
          | None => None
@@ -487,13 +487,13 @@ Open Scope Z_scope.
 Fixpoint copy_array {A : Type} (p : list A * Z) (len : Z)
          (op : option (list A * Z)) : option (list A) :=
   let '(src,srcoff) := p in
-  If (srcoff < 0) \/ (len < 0) \/ (Zlength src < srcoff + len)
+  if sumbool_or _ _ _ _ (Z_lt_dec srcoff 0) (sumbool_or _ _ _ _ (Z_lt_dec len 0) (Z_lt_dec (Zlength src) (srcoff + len)))
     then None
      else let copied := List.firstn (Z.to_nat len)
                          (List.skipn (Z.to_nat srcoff) src) in
            match op with
            | Some (dst,dstoff) =>
-             If (dstoff < 0) \/ (Zlength dst < dstoff + len)
+             if sumbool_or _ _ _ _ (Z_lt_dec dstoff 0)  (Z_lt_dec (Zlength dst) (dstoff + len))
                then None
                else Some (List.firstn
                             (Z.to_nat dstoff)
@@ -561,11 +561,6 @@ Definition val_ind (P : val -> Prop) := @val_rect P.
 Definition val_rec (P : val -> Set) := @val_rect P.
 
 (** Decidability theorems *)
-Theorem stamp_eq_dec : forall (s0 s1 : stamp), {s0 = s1} + {s0 <> s1}.
-Proof.
-  decide equality; auto with DecidableEquality.
-Defined.
-Hint Resolve stamp_eq_dec : DecidableEquality.
 
 Theorem val_eq_dec : forall (v0 v1 : val), {v0 = v1} + {v0 <> v1}.
 Proof.
