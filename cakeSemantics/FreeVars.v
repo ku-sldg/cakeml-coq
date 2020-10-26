@@ -16,10 +16,10 @@ Fixpoint pattern_vars (p : pat) : list varN :=
       end
   in
   match p with
-  | Pany | Plit _ => []
+  (* | Pany | Plit _ => [] *)
   | Pvar v => [v]
   | Pcon cid pl => pattern_list_vars pl
-  | Pref p' | Ptannot p' _ => pattern_vars p'
+  (* | Pref p' | Ptannot p' _ => pattern_vars p' *)
   end.
 
 Fixpoint free_vars (e : exp) : list (ident modN varN) :=
@@ -45,24 +45,24 @@ Fixpoint free_vars (e : exp) : list (ident modN varN) :=
           end
       in
       match e with
-      | ERaise e' => free_vars_helper e' bl
-      | EHandle e' pes => free_vars_helper e' bl ++ pattern_match_free_vars pes bl
-      | ELit _ => []
+      (* | ERaise e' => free_vars_helper e' bl *)
+      (* | EHandle e' pes => free_vars_helper e' bl ++ pattern_match_free_vars pes bl *)
+      (* | ELit _ => [] *)
       | ECon cid es => exp_list_free_vars es bl
       | EVar id => if in_dec (fun i i' => ident_eq_dec _ _ string_dec string_dec i i' ) id bl
                   then []
                   else [id]
       | EFun var_name e' => free_vars_helper e' ((Short var_name)::bl)
       | EApp o es => exp_list_free_vars es bl
-      | ELog o e1 e2 => free_vars_helper e1 bl ++ free_vars_helper e2 bl
-      | EIf c t f => free_vars_helper c bl ++ free_vars_helper t bl ++ free_vars_helper f bl
+      (* | ELog o e1 e2 => free_vars_helper e1 bl ++ free_vars_helper e2 bl *)
+      (* | EIf c t f => free_vars_helper c bl ++ free_vars_helper t bl ++ free_vars_helper f bl *)
       | EMat e' pes => free_vars_helper e' bl ++ pattern_match_free_vars pes bl
-      | ELet opt_var_name e1 e2 => match opt_var_name with
-                                  | None => free_vars_helper e1 bl ++ free_vars_helper e2 bl
-                                  | Some name => free_vars_helper e1 bl ++ free_vars_helper e2 ((Short name)::bl)
-                                  end
-      | ELetrec vves e' => free_vars_helper e' (map (fun x => Short (fst (fst x))) vves ++ bl) ++ vvexp_list_free_vars vves bl
-      | ETannot e' _ => free_vars_helper e' bl
+      (* | ELet opt_var_name e1 e2 => match opt_var_name with *)
+      (*                             | None => free_vars_helper e1 bl ++ free_vars_helper e2 bl *)
+      (*                             | Some name => free_vars_helper e1 bl ++ free_vars_helper e2 ((Short name)::bl) *)
+      (*                             end *)
+      (* | ELetrec vves e' => free_vars_helper e' (map (fun x => Short (fst (fst x))) vves ++ bl) ++ vvexp_list_free_vars vves bl *)
+      (* | ETannot e' _ => free_vars_helper e' bl *)
       | ELannot e' _ => free_vars_helper e' bl
       end
   in

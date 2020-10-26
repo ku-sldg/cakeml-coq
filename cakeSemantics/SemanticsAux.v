@@ -101,6 +101,7 @@ Inductive val : Type :=
   | Loc : nat -> val
   | Vectorv : list val -> val.
 
+Set Elimination Schemes.
 Definition env_val := namespace modN varN val.
 
 (** [is_closure v] captures whether [v] is a closure or a recursive closure. *)
@@ -514,12 +515,12 @@ Close Scope Z_scope.
 
 Fixpoint val_rect (P : val -> Type)
          (H1 : forall (l : lit), P (Litv l))
-         (H2 : forall (o : option stamp) (l : list val), Forall'' val P l -> P (Conv o l))
-         (H3 : forall (s : sem_env val) (n : varN) (e : exp), Forall'' (ident modN varN * val) (fun p => P (snd p)) (sev s) -> P (Closure s n e))
-         (H4 : forall (s : sem_env val) (l : list (varN * varN * exp)) (n : varN), Forall'' (ident modN varN * val) (fun p => P (snd p)) (sev s) ->
+         (H2 : forall (o : option stamp) (l : list val), Forall''  P l -> P (Conv o l))
+         (H3 : forall (s : sem_env val) (n : varN) (e : exp), Forall'' (fun p => P (snd p)) (sev s) -> P (Closure s n e))
+         (H4 : forall (s : sem_env val) (l : list (varN * varN * exp)) (n : varN), Forall'' (fun p => P (snd p)) (sev s) ->
                                                                             P (Recclosure s l n))
          (H5 : forall (n : nat), P (Loc n))
-         (H6 : forall (l : list val), Forall'' val P l -> P (Vectorv l))
+         (H6 : forall (l : list val), Forall'' P l -> P (Vectorv l))
          (v : val) : P v :=
   let val_rect' := @val_rect P H1 H2 H3 H4 H5 H6 in
   match v with
