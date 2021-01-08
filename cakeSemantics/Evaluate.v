@@ -5,6 +5,7 @@ Require Import CakeSem.CakeAST.
 Require Import CakeSem.FreeVars.
 Require Import CakeSem.SemanticsAux.
 
+Require Import StructTact.StructTactics.
 Require Import PeanoNat.
 Require Import List.
 Require Import ListDec.
@@ -15,6 +16,7 @@ Import ListNotations.
 
 Require Import Omega.
 
+Set Equations With UIP.
 (* ---------------------------------------------------------------------- *)
 (** ** Helper functions *)
 Definition ident_string_dec := ident_eq_dec _ _ string_dec string_dec.
@@ -623,8 +625,8 @@ Qed.
 
 Require Import Coq.Wellfounded.Lexicographic_Product.
 Require Import Relation_Operators.
-
-Definition lex_f_s := lexprod nat lex_exps Rfuel Rsize.
+Print lexprod.
+Definition lex_f_s := lexprod Rfuel Rsize.
 Definition lex_f_s_wf := (wf_lexprod nat lex_exps Rfuel Rsize Rfuel_wf Rsize_wf).
 
 Lemma size_exp_at_least_S : (forall x, 1 <= size_exp x).
@@ -640,7 +642,7 @@ Proof.
       inv H.
       * inv H0.
         intros.
-        inv H.
+        inv H1.
         omega.
         omega.
       * inv H0.
@@ -658,18 +660,16 @@ Proof.
       intros; destruct y.
       inv H0.
       * inv H.
-        -- inv H0. omega.
-        -- apply IHn with (size_exps es). inv H0.
-           left; omega.
-           right; omega.
+        -- inv H0. omega. omega.
+        -- apply IHn with (size_exps es). inv H0. omega. omega.
       * inv H.
-        inv H0.
-      apply IHn with (size_exps l).
-      inv H2.
-      left; omega.
-      right; omega.
-      apply IHn with n0.
-      right; omega.
+        -- inv H1.
+           apply IHn with (size_exps l).
+           omega.
+        -- apply IHn with (size_exps l).
+           inv H0.
+           omega.
+           right; omega.
     + constructor.
       intros; destruct y.
       inv H.
@@ -706,6 +706,7 @@ Defined.
 (*------------- EQUATIONS VERSION ------------------------------------------- *)
 (*----------------------------------------------------------------------------*)
 Require Import Equations.Equations.
+
 
 Instance FSRWellFounded : WellFounded fuel_size_rel.
 apply fuel_size_rel_wf.
@@ -803,8 +804,8 @@ Equations eval_or_match {ffi' : Type} (sel : bool) (es : if sel then list exp el
                                              | Some v' => (st, Rval [v'])
                                              | None => (st, Rerr (Rabort Rtype_error))
                                              end;
-  eval_or_match true [ECon cn es'] fuel st env v ev => if do_con_check (sec env) cn (length es')
-                                                      then match eval_or_match true (rev es') fuel st env v ev with
+  eval_or_match true [ECon cn es'] fuel st env _ _ => if do_con_check (sec env) cn (length es')
+                                                      then match eval_or_match true (rev es') fuel st env uu uu with
                                                            | (st', Rval vs) =>
                                                              match build_conv (sec env) cn (rev vs) with
                                                              | Some v' => (st', Rval [v'])
@@ -858,67 +859,253 @@ Equations eval_or_match {ffi' : Type} (sel : bool) (es : if sel then list exp el
           end)
     else (st, Rerr (Rabort Rtype_error)) }.
 Obligation 1.
-constructor.
-rewrite mutmeasure_equation_1 at 1.
-assert (H : mutmeasure true [ECon cn es'] = size_exps [ECon cn es']) by (simp mutmeasure; reflexivity).
-rewrite H.
-rewrite size_exps_rev.
-simpl. fold size_exps.
-omega.
+- constructor.
+  rewrite mutmeasure_equation_1 at 1.
+  assert (H : mutmeasure true [ECon cn es'] = size_exps [ECon cn es']) by (simp mutmeasure; reflexivity).
+  rewrite H.
+  rewrite size_exps_rev.
+  simpl. fold size_exps.
+  omega.
 Qed.
 Obligation 2.
-constructor; omega.
+- constructor; omega.
 Qed.
 Obligation 3.
-constructor; omega.
+- constructor; omega.
 Qed.
 Obligation 4.
-constructor.
-simp mutmeasure.
-assert (H : mutmeasure true [EMat e pes] = size_exps [EMat e pes]) by (simp mutmeasure; reflexivity).
-rewrite H.
-simpl. fold size_pes. omega.
+- constructor.
+  simp mutmeasure.
+  assert (H : mutmeasure true [EMat e pes] = size_exps [EMat e pes]) by (simp mutmeasure; reflexivity).
+  rewrite H.
+  simpl. fold size_pes. omega.
 Qed.
 Obligation 5.
-constructor.
-simp mutmeasure.
-simpl. fold size_pes.
-omega.
+- constructor.
+  simp mutmeasure.
+  simpl. fold size_pes.
+  omega.
 Qed.
 Obligation 6.
-constructor.
-simp mutmeasure.
+- constructor.
+  simp mutmeasure.
 Qed.
 Obligation 7.
-constructor.
-simp mutmeasure.
-assert (H : mutmeasure true (e1::e2::es') = size_exps (e1::e2::es')) by (simp mutmeasure; reflexivity).
-rewrite H.
-specialize (size_exp_at_least_S e2).
-intros. simpl. omega.
+- constructor.
+  simp mutmeasure.
+  assert (H : mutmeasure true (e1::e2::es') = size_exps (e1::e2::es')) by (simp mutmeasure; reflexivity).
+  rewrite H.
+  specialize (size_exp_at_least_S e2).
+  intros. simpl. omega.
 Qed.
 Obligation 8.
-constructor.
-specialize (size_exp_at_least_S e1). intro.
-simp mutmeasure.
-assert (H' : mutmeasure true (e1::e2::es') = size_exps (e1::e2::es')) by (simp mutmeasure; reflexivity).
-rewrite H'.
-simpl. omega.
+- constructor.
+  specialize (size_exp_at_least_S e1). intro.
+  simp mutmeasure.
+  assert (H' : mutmeasure true (e1::e2::es') = size_exps (e1::e2::es')) by (simp mutmeasure; reflexivity).
+  rewrite H'.
+  simpl. omega.
 Qed.
 Obligation 9.
-constructor.
-simp mutmeasure.
-assert (H : mutmeasure false ((p,e)::pes') = size_pes ((p,e)::pes')) by (simp mutmeasure; reflexivity).
-rewrite H.
-simpl.
-specialize (size_exp_at_least_S e). intro.
-omega.
+- constructor.
+  simp mutmeasure.
+  assert (H : mutmeasure false ((p,e)::pes') = size_pes ((p,e)::pes')) by (simp mutmeasure; reflexivity).
+  rewrite H.
+  simpl.
+  specialize (size_exp_at_least_S e). intro.
+  omega.
 Qed.
 Obligation 10.
-constructor.
-simp mutmeasure.
-simpl.
-omega.
+- constructor.
+  simp mutmeasure.
+  simpl.
+  omega.
+Qed.
+
+Lemma Forall''_app : forall (T : Type) (P : T -> Type) (l : list T) (a : T), Forall'' P l -> P a -> Forall'' P (l ++ [a]).
+  intros.
+  induction l.
+  constructor.
+  assumption.
+  assumption.
+  inv X.
+  constructor.
+  assumption.
+  apply IHl.
+  assumption.
+Qed.
+
+Lemma Forall''_rev : forall (T : Type) (P : T -> Type) (l : list T),
+    Forall'' P l -> Forall'' P (rev l).
+  intros.
+  induction l.
+  constructor.
+  inv X.
+  simpl.
+  apply Forall''_app; auto.
+Qed.
+
+Lemma eval_or_match_sing : forall (A : Type) (e : exp) (f : nat) (st st' : state A) (env : sem_env val) (vs : list val),
+    eval_or_match true [e] f st env uu uu = (st', Rval vs) -> exists (v : val), vs = [v].
+Proof.
+  intros A e f.
+  revert e.
+  induction f; induction e using exp_rect'; intros.
+  - simp eval_or_match in H.
+    destruct (do_con_check (sec env) o (Datatypes.length l)).
+    break_let.
+    destruct r.
+    destruct (build_conv (sec env) o (rev l0)); inv H; eauto.
+    inv H.
+    inv H.
+
+ - simp eval_or_match in H. simp eval_or_match in H.
+   destruct (nsLookup ident_string_dec i (sev env)); inv H; eauto.
+
+ - simp eval_or_match in H. simp eval_or_match in H.
+   inv H.
+   eauto.
+
+ - simp eval_or_match in H. simp eval_or_match in H. inv H.
+
+ - simp eval_or_match in H.
+   induction X.
+   break_let.
+   simp eval_or_match in H.
+   destruct r. apply IHe in Heqp.
+   destruct Heqp.
+   rewrite H0 in *.
+   simp eval_or_match in H.
+   inv H.
+   inv H.
+   break_let.
+   destruct r.
+   apply IHe in Heqp0.
+   destruct Heqp0.
+   rewrite H0 in *. clear H0.
+   destruct x.
+   simpl in *.
+   simp eval_or_match in H.
+   break_if.
+   break_match.
+   apply IHX in H.
+   apply H.
+   inv H.
+   apply p in H.
+   apply H.
+   inv H.
+   inv H.
+
+ - simp eval_or_match in H.
+
+ - simp eval_or_match in H.
+    destruct (do_con_check (sec env) o (Datatypes.length l)).
+    break_let.
+    destruct r.
+    destruct (build_conv (sec env) o (rev l0)); inv H; eauto.
+    inv H.
+    inv H.
+
+ - simp eval_or_match in H.
+   destruct (nsLookup ident_string_dec i (sev env)).
+   inv H. exists v. reflexivity.
+   inv H.
+
+ - simp eval_or_match in H.
+   inv H. exists (Closure env v e). reflexivity.
+
+ - simp eval_or_match in H.
+   break_let.
+   apply Forall''_rev in X.
+   induction X.
+   simp eval_or_match in Heqp.
+   inv Heqp.
+   break_if.
+   simpl in H.
+   inv H.
+   simpl in *.
+   inv H.
+   destruct r.
+   break_if.
+   break_match.
+   break_let.
+   apply IHf in H.
+   apply H.
+   inv H.
+   break_match.
+   break_let.
+   break_let.
+   inv H.
+   destruct r.
+   simpl in *.
+   inv H2.
+   exists v. reflexivity.
+   inv H2.
+   inv H.
+   inv H.
+
+ - simp eval_or_match in H.
+   break_let.
+   destruct r.
+   apply IHe in Heqp.
+   destruct Heqp.
+   rewrite H0 in *.
+   induction X.
+   simp eval_or_match in H.
+   inv H.
+   destruct x0.
+   simp eval_or_match in *.
+   break_if.
+   break_match.
+   apply IHX.
+   apply H.
+   inv H.
+   apply p in H.
+   apply H.
+   inv H.
+   inv H.
+
+ - simp eval_or_match in H.
+Qed.
+
+Theorem eval_or_match_true_ignore : forall (A : Type) (st : state A) (env : sem_env val) (es : list exp) (f : nat)
+                                      (u1 u2 u3 u4 : val),
+    eval_or_match true es f st env u1 u2 = eval_or_match true es f st env u3 u4.
+Proof.
+  intros A st env es. revert A st env.
+  induction es. intros.
+  simp eval_or_match. congruence.
+  destruct es; intros; simp eval_or_match; try congruence.
+  destruct a; simp eval_or_match; try congruence.
+  destruct f; simp eval_or_match; try congruence.
+Qed.
+
+Theorem eval_or_match_cons : forall (A : Type) (st : state A) (env : sem_env val) (e : exp) (es : list exp) (f : nat),
+   eval_or_match true (e::es) f st env uu uu =
+     match eval_or_match true [e] f st env uu uu with
+     | (st', Rval vs) =>
+      match eval_or_match true es f st' env uu uu with
+       | (st'', Rval vs') => (st'', Rval (vs++vs'))
+       | err => err
+      end
+     | err => err
+     end.
+Proof.
+  intros. revert e st.
+  destruct es; intros; simpl.
+  destruct (eval_or_match true [e] f st env uu uu).
+  destruct r.
+  simp eval_or_match.
+  rewrite app_nil_r.
+  congruence.
+  congruence.
+  simp eval_or_match.
+  destruct (eval_or_match true [e0] f st env uu uu) eqn:eval1.
+  destruct r.
+  apply eval_or_match_sing in eval1.
+  destruct eval1. rewrite H. simpl.
+  congruence.
+  congruence.
 Qed.
 
 Definition evaluate {ffi' : Type} := fun l f st env => @eval_or_match ffi' true l f st env uu uu.
