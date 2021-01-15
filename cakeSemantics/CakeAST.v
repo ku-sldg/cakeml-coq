@@ -302,7 +302,7 @@ Proof.
   destruct o1.
   left.
   reflexivity.
-Qed.
+Defined.
 
 Hint Resolve op_eq_dec : DecidableEquality.
 
@@ -410,7 +410,7 @@ Proof.
   - destruct (locs_eq_dec l l0); tryr.
     destruct (IHe0 e1); tryr.
     subst; tryl.
-Qed.
+Defined.
 Hint Resolve exp_eq_dec : DecidableEquality.
 Instance EqDec_exp : EqDec exp := exp_eq_dec.
 
