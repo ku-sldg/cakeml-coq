@@ -1,3 +1,4 @@
 -R . NoBasis
 -R ../../cakeSemantics CakeSem
+-R ../../utils/ StructTact
 NoBasis.v

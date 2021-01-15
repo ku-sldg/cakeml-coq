@@ -141,7 +141,6 @@ Inductive nat_rel_cake_nat (typestamp : nat) : nat -> val -> Prop :=
 | zero_rel : nat_rel_cake_nat typestamp 0 (Conv (Some (TypeStamp "O" typestamp)) [])
 | suc_rel  : forall (n : nat) (prev : val), nat_rel_cake_nat typestamp n prev -> nat_rel_cake_nat typestamp (S n) (Conv (Some (TypeStamp "S" typestamp)) [prev]).
 
-
 Fixpoint nat_to_cake_nat (typestamp : nat) (n : nat) : val :=
   match n with
   | O => (Conv (Some (TypeStamp "O" typestamp)) [])
@@ -154,6 +153,8 @@ Proof.
 Qed.
 
 Ltac step_fuel_in fuel H := destruct fuel; simpl in H.
+
+Print state.
 
 Definition evaluate_diverges {ffi' : Type} (st : state ffi') (env : sem_env val) (e : exp) : Prop :=
   forall (fuel : nat), exists (st' : state ffi'), evaluate [e] fuel st env = (st', Rerr (Rabort Rtimeout_error)).
@@ -194,7 +195,7 @@ Lemma Forall''_rev : forall (T : Type) (P : T -> Type) (l : list T),
   apply Forall''_app; auto.
 Qed.
 
-Lemma evaluate_sing : forall (e : exp) (f : nat) (st st' : state A) (env : sem_env val) (vs : list val),
+Lemma eval_or_match_sing : forall (e : exp) (f : nat) (st st' : state A) (env : sem_env val) (vs : list val),
     eval_or_match true [e] f st env uu uu = (st', Rval vs) -> exists (v : val), vs = [v].
 Proof.
   intros e f.
@@ -340,7 +341,7 @@ Proof.
   simp eval_or_match.
   destruct (eval_or_match true [e0] f st env uu uu) eqn:eval1.
   destruct r.
-  apply evaluate_sing in eval1.
+  apply eval_or_match_sing in eval1.
   destruct eval1. rewrite H. simpl.
   congruence.
   congruence.
@@ -495,7 +496,18 @@ Qed.
 (* Check eval_or_match_elim. *)
 Check eq_refl.
 
-Axiom USOP : forall (U : Type) (x y:U) (p1 p2:x = y), p1 = p2.
+(* Axiom USOP : forall (U : Type) (x y:U) (p1 p2:x = y), p1 = p2. *)
+Require Import Program.
+
+(* Lemma eq_match : forall (X Y : Type) (Z : X -> Type) (y : Y) (z : Z) (H : X = X), *)
+(*     match H in (_ = h) return Z h with *)
+(*     | eq_refl => z *)
+(*     end = z. *)
+(* Proof. *)
+(*   intros. *)
+(*   dependent destruction H. *)
+(*   reflexivity. *)
+(* Qed. *)
 
 Lemma eval_or_match_inc_fuel_val : forall (f : nat) (sel : bool)
                                      (es : if sel then list exp else list (pat * exp)) (st st' : state A)
@@ -546,14 +558,10 @@ Proof.
            assert (ididit = ididit).
            auto.
            rewrite Heqididit in H2.
-
            specialize (H0 s (Rval vs) vs e p s0 e0 n true [e0] s st' s0 uu uu vs H1 H2).
-           Check USOP.
-           assert (H2 = eq_refl).
-           apply USOP.
            apply H0.
            unfold eq_rect.
-           rewrite H3.
+           dependent destruction H2.
            reflexivity.
         -- inv H1.
       + break_match. auto.
@@ -579,16 +587,12 @@ Proof.
            auto.
            rewrite Heqididit in H2.
 
-    specialize (H0 s (Rval vs) vs v vs fuel false l1 s st' env v bind_exn_v vs H1 H2).
-    clear Heqididit.
-    clear ididit.
-    apply H0.
-    unfold eq_rect.
-    assert (H2 = eq_refl).
-    apply USOP.
-    rewrite H3.
-    reflexivity.
-    inv H1.
+           specialize (H0 s (Rval vs) vs v vs fuel false l1 s st' env v bind_exn_v vs H1 H2).
+           apply H0.
+           unfold eq_rect.
+           dependent destruction H2.
+           reflexivity.
+           inv H1.
   - simp eval_or_match in *.
   - simp eval_or_match in *.
     destruct (eval_or_match true [e] fuel st env uu uu) eqn:eval1.
@@ -606,20 +610,17 @@ Proof.
                                                           (@sigmaI (sem_env val) (fun sem => sigma (fun v1 => val )) env
                                                                    (@sigmaI val (fun v1 => val) uu uu)))))))
              as ididit.
-           assert (ididit = ididit).
-           auto.
-           rewrite Heqididit in H2.
-
+    assert (ididit = ididit).
+    auto.
+    rewrite Heqididit in H2.
     specialize (H0 s (Rval vs) vs fuel true (e0::l) s s0 env uu uu l1 eval2 H2).
     unfold eq_rect in H0.
-    assert (H2 = eq_refl).
-    apply USOP.
-    rewrite H3 in H0.
     assert (eval_or_match true (e0 :: l) fuel s env uu uu =
             eval_or_match true (e0 :: l) fuel s env uu uu) by congruence.
     rewrite H0. assumption.
+    dependent destruction H2.
+    reflexivity.
     congruence.
-    inv H1.
     inv H1.
   - simp eval_or_match in *.
   - simp eval_or_match in *.
@@ -643,15 +644,11 @@ Proof.
     auto.
     rewrite Heqididit in H2.
     unfold eq_rect.
-    assert (H2 = eq_refl).
-    apply USOP.
-    Check H0.
     specialize (H0 n a fuel true [e] st st' {| sev := nsAppend (alist_to_ns a) (sev env); sec := sec env |} uu uu vs H1 H2).
     apply H0.
     unfold eq_rect.
-    rewrite H3.
+    dependent destruction H2; reflexivity.
     congruence.
-    inv H1.
 Qed.
 
 Lemma eval_or_match_inc_fuel_res : forall (f : nat) (sel : bool)
@@ -706,13 +703,9 @@ Proof.
 
            Check H0.
            specialize (H0 s res l e p s0 e0 n true [e0] s st' s0 uu uu res H1 H2 H3).
-           Check USOP.
-           assert (H3 = eq_refl).
-           apply USOP.
            apply H0.
            unfold eq_rect.
-           rewrite H4.
-           reflexivity.
+           dependent destruction H3. reflexivity.
         -- congruence.
       * break_match; auto.
     + congruence.
@@ -739,9 +732,7 @@ Proof.
     specialize (H0 s res l v l fuel false l1 s st' env v bind_exn_v res H1 H2 H3).
     apply H0.
     unfold eq_rect.
-    assert (H3 = eq_refl).
-    apply USOP.
-    rewrite H4.
+    dependent destruction H3.
     reflexivity.
     destruct r; congruence.
   - simp eval_or_match in *.
@@ -768,20 +759,17 @@ Proof.
         -- assert (HneqValErr : ((Rval l1 : result (list val) val) <> Rerr (Rabort Rtimeout_error))) by congruence.
         specialize (H0 s (Rval l1) l1 fuel true (e0::l) s s0 env uu uu (Rval l1) HneqValErr eval2 H3).
         unfold eq_rect in H0.
-        assert (H3 = eq_refl) by apply USOP.
-        rewrite H4 in H0.
+        dependent destruction H3.
         rewrite H0; congruence.
         -- assert (HneqValErr : ((Rval l1 : result (list val) val) <> Rerr (Rabort Rtimeout_error))) by congruence.
            specialize (H0 s (Rval (l1)) l1 fuel true (e0::l) s s0 env uu uu (Rval (l1)) HneqValErr eval2 H3).
            unfold eq_rect in H0.
-           assert (H3 = eq_refl) by apply USOP.
-           rewrite H4 in H0.
+           dependent destruction H3.
            rewrite H0; congruence.
         * inv H2.
           specialize (H0 s (Rerr e1) l0 fuel true (e0::l) s st' env uu uu (Rerr e1) H1 eval2 H3).
           unfold eq_rect in H0.
-          assert (H3 = eq_refl) by apply USOP.
-          rewrite H2 in H0.
+          dependent destruction H3.
           rewrite H0; congruence.
     + congruence.
     + destruct r; congruence.
@@ -809,12 +797,10 @@ Proof.
                        uu uu res H1 H2 H3).
         apply H0.
         unfold eq_rect.
-        assert (H3 = eq_refl) by apply USOP.
-        rewrite H4.
+        dependent destruction H3.
         congruence.
     + congruence.
 Qed.
-
 
 Lemma evaluate_inc_fuel_res : forall (f : nat) (es : list exp) (st st' : state A)
                                 (env : sem_env val) (res : result (list val) val),
@@ -826,18 +812,19 @@ Proof.
   apply eval_or_match_inc_fuel_res; assumption.
 Qed.
 
-Lemma more_fuel_same_result : forall (f f' : nat) (st st' : state A) (env : sem_env val) (res : result (list val) val) (es : list exp),
-    f <= f' ->
+Lemma more_fuel_same_result : forall (n f: nat) (st st' : state A) (env : sem_env val) (res : result (list val) val) (es : list exp),
     res <> Rerr (Rabort Rtimeout_error) ->
-    evaluate es f st env = (st', res) ->
-    evaluate es f' st env = (st', res).
+    eval_or_match true es f st env uu uu = (st', res) ->
+    eval_or_match true es f st env uu uu = eval_or_match true es (n+f) st env uu uu.
 Proof.
-  intros f f'. generalize dependent f.
-  induction f';
-    intros f st st' env res es H H1 contra;
-    inv H; auto.
-    apply eval_or_match_inc_fuel_res; auto.
-    apply IHf' with f; auto.
+  induction n.
+  - intros. reflexivity.
+  - intros.
+    rewrite H0.
+    apply eval_or_match_inc_fuel_res in H0; try assumption.
+    rewrite <- H0.
+    rewrite plus_Snm_nSm.
+    apply IHn with st' res; try assumption.
 Qed.
 
 Theorem ELannot_does_nothing : forall (e : exp) (l : locs) (f : nat) (st : state A) (env : sem_env val),
@@ -886,6 +873,123 @@ Ltac match_exp_same :=
     rewrite Hass in H; clear Hass
   end.
 
+Theorem eval_or_match_len_exp_len_val : forall (sel : bool) (es : if sel then list exp else list (pat * exp)) (f : nat) (st st' : state A) (env : sem_env val) (match_v err_v : val) (vs : list val),
+  eval_or_match sel es f st env match_v err_v = (st', Rval vs) ->
+  length vs = if sel then length vs else 1.
+Proof.
+  intros.
+  funelim (eval_or_match sel es f st env match_v err_v); try reflexivity.
+  - congruence.
+  - simpl in *.
+    break_if.
+    + rewrite H1 in Heqcall.
+      break_match; try congruence.
+      * apply H with st'.
+        assumption.
+        assumption.
+      * apply eval_or_match_sing in Heqcall.
+        destruct Heqcall.
+        rewrite H2. reflexivity.
+    + rewrite H1 in Heqcall. congruence.
+Qed.
+Check Forall.
+
+Definition noTimeout e f (st : state A) env st' :=
+  eval_or_match true [e] f st env uu uu <> (st', Rerr (Rabort Rtimeout_error)).
+
+Theorem exp_no_div_sub_exp_no_div : forall (es : list exp ) (f : nat) (st st' : state A) (env : sem_env val)
+                                      (res : result (list val) val),
+    res <> Rerr (Rabort Rtimeout_error) ->
+    eval_or_match true es f st env uu uu = (st', res) ->
+    Forall (fun e => noTimeout e f st env st') es.
+Proof.
+  intros.
+  funelim (eval_or_match true es f st env uu uu); try solve [constructor]; try (solve [constructor; try (unfold noTimeout; destruct res; congruence); try constructor]).
+  - clear Heqcall.
+    simpl in *.
+    rewrite eval_or_match_cons in *.
+    rewrite eval_or_match_cons in *.
+    simp eval_or_match in *.
+    constructor.
+    unfold noTimeout.
+    destruct (eval_or_match true [e] fuel st env uu uu).
+    destruct r.
+    congruence.
+    destruct e1; congruence.
+    destruct (eval_or_match true (e0::l) fuel st' env uu uu) eqn:eval1.
+    Check H0.
+
+
+
+
+
+
+
+
+
+
+
+
+Abort.
+
+(* Theorem state_never_changes : forall (sel : bool) (es : if sel then list exp else list (pat * exp)) *)
+(*                                 (f : nat) (st st' : state A) (env : sem_env val) (match_v err_v : val) (res : result (list val) val), *)
+(*     eval_or_match sel es f st env match_v err_v = (st', res) -> *)
+(*     st = st'. *)
+(* Proof. *)
+(*   intros. *)
+(*   funelim (eval_or_match sel es f st env match_v err_v); simp eval_or_match in *; simpl in *. *)
+(*   - inv H; congruence. *)
+(*   - break_if; try congruence. *)
+(*     break_match. *)
+(*     apply H with r. *)
+(*     break_match. *)
+(*     break_match; *)
+(*       inv H0; congruence. *)
+(*     inv H0; congruence. *)
+(*   - break_match; inv H; congruence. *)
+(*   - inv H; congruence. *)
+(*   - inv H; congruence. *)
+(*   - unfold eq_rect in *; simpl in *. *)
+(*     break_let. *)
+(*     break_match. *)
+(*     break_if. *)
+(*     break_match. *)
+(*     break_let. *)
+
+(*     pose proof (@eq_refl _ (@sigmaI Type (fun x => sigma (fun b : bool => sigma (fun l : if b then list exp else list (pat * exp) => sigma (fun n => sigma (fun st : state x => sigma (fun sem => sigma (fun v1 => val ))))))) A *)
+(*                           (@sigmaI bool (fun b : bool => sigma (fun l : if b then list exp else list (pat * exp) => sigma (fun n => sigma (fun st => sigma (fun sem => sigma (fun v1 => val )))))) true *)
+(*                                    (@sigmaI (list exp) (fun l => sigma (fun n => sigma (fun st => sigma (fun sem => sigma (fun v1 => val ))))) [e0] *)
+(*                                             (@sigmaI nat (fun n => sigma (fun st => sigma (fun sem => sigma (fun v1 => val )))) n *)
+(*                                                      (@sigmaI (state A) (fun st => sigma (fun sem => sigma (fun v1 => val ))) s *)
+(*                                                               (@sigmaI (sem_env val) (fun sem => sigma (fun v1 => val )) s0 *)
+(*                                                                        (@sigmaI val (fun v1 => val) uu uu)))))))) as SigEq. *)
+(*     specialize (H0 s res l e p s0 e0 true [e0] n s st' s0 uu uu res H1 SigEq). *)
+(*     dependent destruction SigEq. *)
+(*     rewrite <- Heqp in H. *)
+(*     specialize (H s (Rval l)). *)
+(*     apply H in Heqp. *)
+(*     apply H0 in Heqcall. *)
+(*     subst. reflexivity. *)
+(*     apply (H st' (Rval l)). *)
+(*     inv H1. reflexivity. *)
+(*     apply (H st' (Rval l)). *)
+(*     inv H1. reflexivity. *)
+(*     apply (H st' (Rerr e)). *)
+(*     inv H1. *)
+(*     reflexivity. *)
+(*   - break_let. *)
+(*     break_match. *)
+(*     break_match. *)
+(*     apply (H st' (Rval l)). *)
+(*     inv H1. reflexivity. *)
+(*     Check H0. *)
+(*     specialize (H0 ) *)
+
+
+
+
+
 
 Theorem plus_vs_cake_plus : forall (m n t f : nat) (m_exp n_exp : exp) (m_val n_val m_n_val : val) (env : sem_env val),
     environment_extended my_env env ->
@@ -902,22 +1006,68 @@ Proof.
   unfold evaluate in *.
   apply eval_or_match_inc_fuel_res in H4; try congruence.
   apply eval_or_match_inc_fuel_res in H4; try congruence.
+  apply eval_or_match_inc_fuel_res in H4; try congruence.
+  apply eval_or_match_inc_fuel_res in H4; try congruence.
   simp eval_or_match in *; simpl in *.
   rewrite eval_or_match_cons in H4; simpl in *.
+  apply eval_or_match_inc_fuel_res in H1; try congruence.
+  apply eval_or_match_inc_fuel_res in H1; try congruence.
   apply eval_or_match_inc_fuel_res in H1; try congruence.
   rewrite H1 in H4.
   simp eval_or_match in *; simpl in *.
   simp eval_or_match in *; simpl in *.
+  apply eval_or_match_inc_fuel_res in H0; try congruence.
+  apply eval_or_match_inc_fuel_res in H0; try congruence.
   rewrite H0 in H4.
   simp eval_or_match in *; simpl in *.
-  break_if; try congruence.
+  Opaque ident_string_dec.
   simp eval_or_match in *; simpl in *.
   simp eval_or_match in *; simpl in *.
+  Transparent ident_string_dec.
+  Opaque build_rec_env.
   simp eval_or_match in *; simpl in *.
-  break_match
+  Opaque ident_string_dec.
+  simp eval_or_match in *; simpl in *.
+  revert H H0 H1 H3 H4. revert n env m_exp n_exp.
+  induction H2.
+  - intros. Transparent ident_string_dec. Opaque stamp_eq_dec. simpl in *.
+    destruct (stamp_eq_dec (TypeStamp "O" 0) (TypeStamp "O" t)).
+    + simp eval_or_match in H4; simpl in H4.
+      inv H4.
+      apply H3.
+    + destruct (stamp_eq_dec (TypeStamp "S" 0) (TypeStamp "O" t)); inv H4.
+  - intros. simpl in H4.
+    destruct (stamp_eq_dec (TypeStamp "O" 0) (TypeStamp "S" t)); try congruence.
+    destruct (stamp_eq_dec (TypeStamp "S" 0) (TypeStamp "S" t)); try congruence.
+    simp eval_or_match in H4; simpl in H4.
+    simp eval_or_match in H4; simpl in H4.
+    simp eval_or_match in H4; simpl in H4.
+    simp eval_or_match in H4; simpl in H4.
+    simp eval_or_match in H4; simpl in H4.
+    simp eval_or_match in H4; simpl in H4.
+    Transparent build_rec_env. simpl in H4.
+    simp eval_or_match in H4; simpl in H4.
+    simp eval_or_match in H4; simpl in H4.
+    simp eval_or_match in H4; simpl in H4.
+    Transparent build_rec_env. simpl in *.
+    simp eval_or_match in H4; simpl in H4.
+    simp eval_or_match in H4; simpl in IHnat_rel_cake_nat.
+    destruct prev; try congruence.
+    break_match.
+    break_inner_match.
+    break_inner_match.
+    break_inner_match.
+    break_inner_match.
+    inv H4.
+    simp eval_or_match in *; simpl in *.
+    inv Heqp.
+    Search "plus".
+    rewrite <- plus_Sn_m.
+    rewrite plus_Snm_nSm.
+    eapply IHnat_rel_cake_nat.
+    apply H.
 
-
-
+  (* I'm not sure which one is easier *)
   intros.
   revert H H0 H1 H3 H4. revert env m_n_val n_val n_exp m_exp f n.
   induction H2; unfold evaluate in *.
@@ -936,10 +1086,18 @@ Proof.
     simp eval_or_match in H4.
     apply eval_or_match_inc_fuel_res in H0; try congruence.
     rewrite H0 in H4.
-    simp eval_or_match in H4.
-    simpl in *.
-    simp eval_or_match in H4.
-    simpl in *.
+    Opaque stamp_eq_dec.
+    simp eval_or_match in H4; simpl in *.
+    simp eval_or_match in H4; simpl in *.
+    simp eval_or_match in H4; simpl in  *.
+    simp eval_or_match in H4; simpl in  *.
+    destruct (stamp_eq_dec (TypeStamp "O" 0) (TypeStamp "O" t)).
+    + simp eval_or_match in H4; simpl in  *.
+      inv H4. assumption.
+    + destruct (stamp_eq_dec (TypeStamp "S" 0) (TypeStamp "O" t));
+        simp eval_or_match in H4; simpl in *; inv H4.
+  - intros.
+    simp eval_or_match in *; simpl in  *.
     destruct (op_eq_dec); try congruence.
     simpl in *.
     simp eval_or_match in H4.
@@ -988,3 +1146,4 @@ Proof.
     simp eval_or_match in H4; simpl in *.
     simp eval_or_match in H4; simpl in *.
     simp eval_or_match in H4. rewrite SECCLEAN in H4.
+)

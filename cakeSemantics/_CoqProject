@@ -1,4 +1,5 @@
 -R . CakeSem
+-R ../utils/ StructTact
 Word.v
 Utils.v
 ffi/FFI.v
