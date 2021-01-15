@@ -1,5 +1,3 @@
 -R . NoBasis
--R /home/barclata/projects/sldg/cakeml-coq/cakeSemantics CakeSem
--R /home/barclata/projects/sldg/cakeml-verif/src/infrastructure Infra
+-R ../../cakeSemantics CakeSem
 NoBasis.v
-EvaluateTest.v
