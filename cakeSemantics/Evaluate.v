@@ -14,7 +14,7 @@ Import Peano_dec.
 Import ZArith_dec.
 Import ListNotations.
 
-Require Import Omega.
+Require Import Lia.
 
 Set Equations With UIP.
 (* ---------------------------------------------------------------------- *)
@@ -23,7 +23,7 @@ Definition ident_string_dec := ident_eq_dec _ _ string_dec string_dec.
 
 (* ---------------------------------------------------------------------- *)
 (** ** Store assign *)
-Fixpoint store_assign {A : Type} (n : nat) (v : store_v A) (st : store A) : option (store A) :=
+Definition store_assign {A : Type} (n : nat) (v : store_v A) (st : store A) : option (store A) :=
   match List.nth_error st n with
   | Some v' => if store_v_same_type v' v
               then Some (update n v st)
@@ -154,18 +154,18 @@ Fixpoint do_eq (e1 e2 : val) : eq_result :=
       end
   in
   match e1, e2 with
-  | Litv l1, Litv l2 => if lit_same_type l1 l2
-                       then Eq_val (proj1_sig (bool_of_sumbool (lit_eq_dec l1 l2)))
-                       else Eq_type_error
-  | Loc l1, Loc l2 => Eq_val (Nat.eqb l1 l2)
+  (* | Litv l1, Litv l2 => if lit_same_type l1 l2 *)
+  (*                      then Eq_val (proj1_sig (bool_of_sumbool (lit_eq_dec l1 l2))) *)
+  (*                      else Eq_type_error *)
+  (* | Loc l1, Loc l2 => Eq_val (Nat.eqb l1 l2) *)
   | Conv cn1 vs1, Conv cn2 vs2 => if sumbool_and _ _ _ _ (option_eq_dec stamp stamp_eq_dec cn1 cn2) (eq_nat_dec (length vs1) (length vs2))
                                  then do_eq_list vs1 vs2
-                                 else if ctor_same_type cn1 cn2
+                                 else if ctor_same_type_dec cn1 cn2
                                       then Eq_val false
                                       else Eq_type_error
-  | Vectorv vs1, Vectorv vs2 => if eq_nat_dec (length vs1) (length vs2)
-                               then do_eq_list vs1 vs2
-                               else Eq_val false
+  (* | Vectorv vs1, Vectorv vs2 => if eq_nat_dec (length vs1) (length vs2) *)
+  (*                              then do_eq_list vs1 vs2 *)
+  (*                              else Eq_val false *)
   | Closure _ _ _, Closure _ _ _ => Eq_val true
   | Closure _ _ _, Recclosure _ _ _ => Eq_val true
   | Recclosure _ _ _, Closure _ _ _ => Eq_val true
@@ -182,7 +182,7 @@ Fixpoint do_eq (e1 e2 : val) : eq_result :=
 (* LATER: not needed in the relational bigstep *)
 
 
-Fixpoint do_opapp (vs : list val) : option (sem_env val * exp) :=
+Definition do_opapp (vs : list val) : option (sem_env val * exp) :=
   match vs with
   | (Closure env n e)::v::[] =>
     Some (update_sev env (nsBind n v (sev env)), e)
@@ -218,7 +218,7 @@ Definition natFromInteger (size : nat) :=
 Definition word8FromInteger (i : Z) : word 8 := nat_to_word 8 (natFromInteger 8 i)%nat .
 Definition word64FromInteger (i : Z) : word 64 :=  nat_to_word 64 (natFromInteger 64%nat i).
 
-Fixpoint do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
+Definition do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
   : option (store_ffi ffi' val * result val val) :=
   match st with
     (s, t) =>
@@ -556,7 +556,7 @@ Proof.
   - reflexivity.
   - intro es'.
     simpl. rewrite IHes.
-    omega.
+    lia.
 Qed.
 
 Theorem size_exps_rev : forall (es : list exp), size_exps (rev es) = size_exps es.
@@ -564,7 +564,7 @@ Proof.
   induction es.
   - reflexivity.
   - simpl. rewrite size_exps_app.
-    rewrite IHes. simpl. omega.
+    rewrite IHes. simpl. lia.
 Qed.
 
 Inductive fuel_size_rel : nat * list exp -> nat * list exp -> Prop :=
@@ -581,7 +581,6 @@ Inductive fuel_size_pes_rel : nat * list (pat * exp) -> nat * list (pat * exp) -
 | spfuel_less : forall (f f' : nat) (pes pes' : list (pat * exp)), f < f' -> fuel_size_pes_rel (f, pes) (f', pes').
 
 Require Import Coq.Init.Wf.
-Require Import Omega.
 Require Program.
 
 Definition Rfuel (f f' : nat) := f < f'.
@@ -600,17 +599,17 @@ Proof.
     inv IHa.
     apply H1.
     unfold Rfuel in *.
-    omega.
+    lia.
 Qed.
 
 Lemma Rsize_wf' : forall f len es, size_exps es <= len -> Acc (Rsize f) es.
   intros f len.
   induction len; intros; constructor; intros.
   - unfold Rsize in *.
-    omega.
+    lia.
   - apply IHlen.
     unfold Rsize in *.
-    omega.
+    lia.
 Qed.
 
 Theorem Rsize_wf : forall f, well_founded (Rsize f).
@@ -620,7 +619,7 @@ Proof.
   - inv H.
   - apply Rsize_wf' with (size_exps (a::a0)).
     unfold Rsize in *.
-    omega.
+    lia.
 Qed.
 
 Require Import Coq.Wellfounded.Lexicographic_Product.
@@ -631,7 +630,7 @@ Definition lex_f_s_wf := (wf_lexprod nat lex_exps Rfuel Rsize Rfuel_wf Rsize_wf)
 
 Lemma size_exp_at_least_S : (forall x, 1 <= size_exp x).
 Proof.
-  destruct x; simpl; omega.
+  destruct x; simpl; lia.
 Defined.
 
 Theorem fuel_size_rel_wf' : forall n m f es, f = n /\ size_exps es <= m \/ f < n  -> Acc fuel_size_rel (f, es).
@@ -643,8 +642,8 @@ Proof.
       * inv H0.
         intros.
         inv H1.
-        omega.
-        omega.
+        lia.
+        lia.
       * inv H0.
     + constructor.
       intros.
@@ -652,38 +651,38 @@ Proof.
       inv H1.
       inv H0.
       apply IHm.
-      left; split; omega.
-      omega.
-      omega.
+      left; split; lia.
+      lia.
+      lia.
   - induction m.
     + constructor.
       intros; destruct y.
       inv H0.
       * inv H.
-        -- inv H0. omega. omega.
-        -- apply IHn with (size_exps es). inv H0. omega. omega.
+        -- inv H0. lia. lia.
+        -- apply IHn with (size_exps es). inv H0. lia. lia.
       * inv H.
         -- inv H1.
            apply IHn with (size_exps l).
-           omega.
+           lia.
         -- apply IHn with (size_exps l).
            inv H0.
-           omega.
-           right; omega.
+           lia.
+           right; lia.
     + constructor.
       intros; destruct y.
       inv H.
       inv H1.
       inv H0.
       apply IHm.
-      left; omega.
+      left; lia.
       apply IHm.
-      right; omega.
+      right; lia.
       inv H0.
       apply IHm.
-      right; omega.
+      right; lia.
       apply IHm.
-      right; omega.
+      right; lia.
 Defined.
 
 Theorem fuel_size_rel_wf : well_founded fuel_size_rel.
@@ -693,13 +692,13 @@ Proof.
   induction n; constructor; intros.
   inv H.
   apply fuel_size_rel_wf' with (n := 0) (m := size_exps l).
-  left; omega.
+  left; lia.
   inv H2.
   inv H.
   apply fuel_size_rel_wf' with (n := S n) (m := size_exps l).
-  left; omega.
+  left; lia.
   apply fuel_size_rel_wf' with f (size_exps es).
-  left; omega.
+  left; lia.
 Defined.
 
 (*----------------------------------------------------------------------------*)
@@ -729,7 +728,7 @@ Equations evaluate_match {ffi' : Type} (pes : list (pat * exp)) (fuel : nat) (st
           end)
     else (st, Rerr (Rabort Rtype_error)) }.
 
-Definition uu : val := Loc 0.
+Definition uu : val := Conv None [].
 
 Inductive lexicographic_rel : nat * nat -> nat * nat -> Prop :=
 | fst_eq : forall (n n21 n22 : nat), n21 < n22 -> lexicographic_rel (n, n21) (n, n22)
@@ -743,21 +742,21 @@ Proof.
       intros. destruct y.
       destruct H.
       * destruct H. subst.
-        inv H0; omega.
-      * omega.
+        inv H0; lia.
+      * lia.
     + constructor. intros. destruct y. destruct H.
       * destruct H.
         apply IHm2.
         inv H0.
-        -- left. split; omega.
-        -- right; omega.
+        -- left. split; lia.
+        -- right; lia.
       * apply IHm2.
         inv H.
   - induction m2; constructor; intros; destruct y; inv H0.
-    + apply IHn2 with m1; omega.
-    + apply IHn2 with n0; omega.
-    + apply IHm2; omega.
-    + apply IHm2; omega.
+    + apply IHn2 with m1; lia.
+    + apply IHn2 with n0; lia.
+    + apply IHm2; lia.
+    + apply IHm2; lia.
 Qed.
 
 Instance LexRWellFounded : WellFounded lexicographic_rel.
@@ -767,14 +766,14 @@ constructor; intros; destruct y.
 induction n1.
 - inv H.
   + apply lexicographic_rel_wf' with n0 n0.
-    right. omega.
+    right. lia.
   + apply lexicographic_rel_wf' with n n.
-    right. omega.
+    right. lia.
 - inv H.
   + apply lexicographic_rel_wf' with (S n1) n0.
-    left. omega.
+    left. lia.
   + apply lexicographic_rel_wf' with n n0.
-    right. omega.
+    right. lia.
 Qed.
 
 Derive NoConfusion for exp.
@@ -783,9 +782,9 @@ Equations mutmeasure (b : bool) (arg : if b then list exp else list (pat * exp))
   mutmeasure true es => size_exps es;
   mutmeasure false pes => size_pes pes }.
 
-Equations eval_or_match {ffi' : Type} (sel : bool) (es : if sel then list exp else list (pat * exp))
-          (fuel : nat) (st : state ffi') (env : sem_env val) (match_v : val) (err_v : val)
-  : state ffi' * result (list val) val by wf (fuel, mutmeasure sel es) lexicographic_rel := {
+Equations eval_or_match (sel : bool) (es : if sel then list exp else list (pat * exp))
+          (fuel : nat) (st : state nat) (env : sem_env val) (match_v : val) (err_v : val)
+  : state nat * result (list val) val by wf (fuel, mutmeasure sel es) lexicographic_rel := {
   eval_or_match true [] _ st _ _ _ => (st, Rval []);
   eval_or_match true (e1::e2::es') fuel st env _ _ =>
     match eval_or_match true [e1] fuel st env uu uu with
@@ -865,26 +864,26 @@ Obligation 1.
   rewrite H.
   rewrite size_exps_rev.
   simpl. fold size_exps.
-  omega.
+  lia.
 Qed.
 Obligation 2.
-- constructor; omega.
+- constructor; lia.
 Qed.
 Obligation 3.
-- constructor; omega.
+- constructor; lia.
 Qed.
 Obligation 4.
 - constructor.
   simp mutmeasure.
   assert (H : mutmeasure true [EMat e pes] = size_exps [EMat e pes]) by (simp mutmeasure; reflexivity).
   rewrite H.
-  simpl. fold size_pes. omega.
+  simpl. fold size_pes. lia.
 Qed.
 Obligation 5.
 - constructor.
   simp mutmeasure.
   simpl. fold size_pes.
-  omega.
+  lia.
 Qed.
 Obligation 6.
 - constructor.
@@ -896,7 +895,7 @@ Obligation 7.
   assert (H : mutmeasure true (e1::e2::es') = size_exps (e1::e2::es')) by (simp mutmeasure; reflexivity).
   rewrite H.
   specialize (size_exp_at_least_S e2).
-  intros. simpl. omega.
+  intros. simpl. lia.
 Qed.
 Obligation 8.
 - constructor.
@@ -904,7 +903,7 @@ Obligation 8.
   simp mutmeasure.
   assert (H' : mutmeasure true (e1::e2::es') = size_exps (e1::e2::es')) by (simp mutmeasure; reflexivity).
   rewrite H'.
-  simpl. omega.
+  simpl. lia.
 Qed.
 Obligation 9.
 - constructor.
@@ -913,13 +912,13 @@ Obligation 9.
   rewrite H.
   simpl.
   specialize (size_exp_at_least_S e). intro.
-  omega.
+  lia.
 Qed.
 Obligation 10.
 - constructor.
   simp mutmeasure.
   simpl.
-  omega.
+  lia.
 Qed.
 
 Lemma Forall''_app : forall (T : Type) (P : T -> Type) (l : list T) (a : T), Forall'' P l -> P a -> Forall'' P (l ++ [a]).
@@ -945,11 +944,13 @@ Lemma Forall''_rev : forall (T : Type) (P : T -> Type) (l : list T),
   apply Forall''_app; auto.
 Qed.
 
-Lemma eval_or_match_sing : forall (A : Type) (e : exp) (f : nat) (st st' : state A) (env : sem_env val) (vs : list val),
+Lemma eval_or_match_sing : forall (e : exp) (f : nat) (st st' : state nat) (env : sem_env val) (vs : list val),
     eval_or_match true [e] f st env uu uu = (st', Rval vs) -> exists (v : val), vs = [v].
 Proof.
-  intros A e f.
+  intros e f.
   revert e.
+  Check exp.
+  Print exp_rect'.
   induction f; induction e using exp_rect'; intros.
   - simp eval_or_match in H.
     destruct (do_con_check (sec env) o (Datatypes.length l)).
@@ -999,12 +1000,12 @@ Proof.
  - simp eval_or_match in H.
 
  - simp eval_or_match in H.
-    destruct (do_con_check (sec env) o (Datatypes.length l)).
-    break_let.
-    destruct r.
-    destruct (build_conv (sec env) o (rev l0)); inv H; eauto.
-    inv H.
-    inv H.
+   destruct (do_con_check (sec env) o (Datatypes.length l)).
+   break_let.
+   destruct r.
+   destruct (build_conv (sec env) o (rev l0)); inv H; eauto.
+   inv H.
+   inv H.
 
  - simp eval_or_match in H.
    destruct (nsLookup ident_string_dec i (sev env)).
@@ -1068,11 +1069,11 @@ Proof.
  - simp eval_or_match in H.
 Qed.
 
-Theorem eval_or_match_true_ignore : forall (A : Type) (st : state A) (env : sem_env val) (es : list exp) (f : nat)
+Theorem eval_or_match_true_ignore : forall (st : state nat) (env : sem_env val) (es : list exp) (f : nat)
                                       (u1 u2 u3 u4 : val),
     eval_or_match true es f st env u1 u2 = eval_or_match true es f st env u3 u4.
 Proof.
-  intros A st env es. revert A st env.
+  intros st env es. revert st env.
   induction es. intros.
   simp eval_or_match. congruence.
   destruct es; intros; simp eval_or_match; try congruence.
@@ -1080,7 +1081,7 @@ Proof.
   destruct f; simp eval_or_match; try congruence.
 Qed.
 
-Theorem eval_or_match_cons : forall (A : Type) (st : state A) (env : sem_env val) (e : exp) (es : list exp) (f : nat),
+Theorem eval_or_match_cons : forall (st : state nat) (env : sem_env val) (e : exp) (es : list exp) (f : nat),
    eval_or_match true (e::es) f st env uu uu =
      match eval_or_match true [e] f st env uu uu with
      | (st', Rval vs) =>
@@ -1108,7 +1109,7 @@ Proof.
   congruence.
 Qed.
 
-Definition evaluate {ffi' : Type} := fun l f st env => @eval_or_match ffi' true l f st env uu uu.
+Definition evaluate := fun l f st env => @eval_or_match true l f st env uu uu.
 
 Fixpoint identity_to_string (i : ident modN varN) : string :=
   match i with
@@ -1248,146 +1249,61 @@ Definition size_decs (ds : list dec) : nat := fold_left plus (map size_dec ds) O
 
 Lemma size_dec_min_1 : forall (d : dec), 1 <= size_dec d.
 Proof.
- destruct d; simpl; omega.
+ destruct d; simpl; lia.
 Qed.
 
 Equations evaluate_decs {ffi' : Type} (fuel : nat) (st : state ffi') (env : sem_env val) (decl : list dec)
   : state ffi' * result (sem_env val) val by wf (size_decs decl) := {
     evaluate_decs _ st _ [] => (st, Rval empty_sem_env);
     evaluate_decs fuel st env (d1::d2::decl') =>
-    match evaluate_decs fuel st env [d1] with
-    | (st1, Rval env1) =>
-      match evaluate_decs fuel st1 (extend_dec_env env1 env) (d2::decl') with
-      | (st2, r) => (st2, combine_dec_result env1 r)
-      end
-    | res => res
-    end;
+        match evaluate_decs fuel st env [d1] with
+        | (st1, Rval env1) =>
+          match evaluate_decs fuel st1 (extend_dec_env env1 env) (d2::decl') with
+          | (st2, r) => (st2, combine_dec_result env1 r)
+          end
+        | res => res
+        end;
     evaluate_decs fuel st env [Dlet locs p e] =>
-    if NoDuplicates_dec string_dec (pat_bindings p)
-    then match evaluate_opt st env [e] fuel with
-         | (st', Rval v) =>
-           (st', match pmatch (sec env) (refs st') p (hd (Litv (StrLit "IF HERE THEN BAD")) v) [] with
-                 | Match new_vals => Rval {| sec := nsEmpty; sev := alist_to_ns new_vals |}
-                 | No_match => Rerr (Rraise bind_exn_v)
-                 | Match_type_error => Rerr (Rabort Rtype_error)
-                 end)
-         | (st', Rerr err) => (st', Rerr err)
-         end
-    else (st, Rerr (Rabort Rtype_error));
+        if NoDuplicates_dec string_dec (pat_bindings p)
+        then match evaluate_opt st env [e] fuel with
+             | (st', Rval v) =>
+               (st', match pmatch (sec env) (refs st') p (hd (Conv None []) v) [] with
+                     | Match new_vals => Rval {| sec := nsEmpty; sev := alist_to_ns new_vals |}
+                     | No_match => Rerr (Rraise bind_exn_v)
+                     | Match_type_error => Rerr (Rabort Rtype_error)
+                     end)
+             | (st', Rerr err) => (st', Rerr err)
+             end
+        else (st, Rerr (Rabort Rtype_error));
     evaluate_decs fuel st env [Dletrec locs funs] =>
-    (st,
-     if NoDuplicates_dec string_dec (map (fun x => fst (fst x)) funs)
-     then Rval {| sev := build_rec_env funs env nsEmpty; sec := nsEmpty |}
-     else Rerr (Rabort Rtype_error));
+        (st,
+         if NoDuplicates_dec string_dec (map (fun x => fst (fst x)) funs)
+         then Rval {| sev := build_rec_env funs env nsEmpty; sec := nsEmpty |}
+         else Rerr (Rabort Rtype_error));
     evaluate_decs fuel st env [Dtype locs tds] =>
-    if UniqueCtorsInDefs_dec tds
-    then (state_update_next_type_stamp st (next_type_stamp st + List.length tds),
-          Rval {| sev := nsEmpty; sec := build_tdefs (next_type_stamp st) tds |})
-    else (st, Rerr (Rabort Rtype_error)) }.
+        if UniqueCtorsInDefs_dec tds
+        then (state_update_next_type_stamp st (next_type_stamp st + List.length tds),
+              Rval {| sev := nsEmpty; sec := build_tdefs (next_type_stamp st) tds |})
+        else (st, Rerr (Rabort Rtype_error)) }.
 Obligation 1.
 unfold size_decs. simpl.
 assert (fold_addition_lt : forall (l : list nat) (n m : nat), n < m -> n < fold_left plus l m).
-    (induction l; intros n m H; try (specialize (IHl n (m+a))); simpl; omega).
+    (induction l; intros n m H; try (specialize (IHl n (m+a))); simpl; lia).
 pose size_dec_min_1 as H.
 destruct d1; simpl;
 try (apply fold_addition_lt;
-specialize (size_dec_min_1 d2); omega).
+specialize (size_dec_min_1 d2); lia).
 Qed.
 Obligation 2.
 unfold size_decs. simpl.
 assert (fold_addition_lt : forall (l : list nat) (m n : nat), m < m + n -> fold_left plus l m < fold_left plus l (m + n)).
 induction l; intros m n H.
-simpl; omega.
-simpl. rewrite <- (plus_assoc m n a). rewrite (plus_comm n a). rewrite (plus_assoc m a n).
-apply IHl. omega.
-rewrite plus_comm.
+simpl; lia.
+simpl. rewrite <- (Plus.plus_assoc m n a). rewrite (Plus.plus_comm n a). rewrite (Plus.plus_assoc m a n).
+apply IHl. lia.
+rewrite Plus.plus_comm.
 apply fold_addition_lt.
 specialize (size_dec_min_1 d2).
 specialize (size_dec_min_1 d1).
-omega.
+lia.
 Qed.
-
-(* Program Fixpoint evaluate_decs {ffi' : Type} (fuel : nat) (st : state ffi') (env : sem_env val) (decl : list dec) *)
-(*         {measure (size_decs decl)}: *)
-(*   (state ffi' * result (sem_env val) val) := *)
-(*   let fuel' := fuel in *)
-(*   (* match fuel with *) *)
-(*   (* | O => (st, Rerr (Rabort Rtimeout_error)) *) *)
-(*   (* | S fuel' => *) *)
-(*     match decl with *)
-(*     | [] => (st, Rval empty_sem_env) *)
-(*     | d1::d2::decl' => match evaluate_decs fuel' st env [d1] with *)
-(*                     | (st1, Rval env1) => *)
-(*                       match evaluate_decs fuel' st1 (extend_dec_env env1 env) (d2::decl') with *)
-(*                       | (st2, r) => (st2, combine_dec_result env1 r) *)
-(*                       end *)
-(*                     | res => res *)
-(*                     end *)
-
-(*     | [Dlet locs p e] => *)
-(*       if NoDuplicates_dec string_dec (pat_bindings p) *)
-(*       then match evaluate_opt st env [e] fuel with *)
-(*            | (st', Rval v) => *)
-(*              (st', match pmatch (sec env) (refs st') p (hd (Litv (StrLit "IF HERE THEN BAD")) v) [] with *)
-(*                    | Match new_vals => Rval {| sec := nsEmpty; sev := alist_to_ns new_vals |} *)
-(*                    | No_match => Rerr (Rraise bind_exn_v) *)
-(*                    | Match_type_error => Rerr (Rabort Rtype_error) *)
-(*                    end) *)
-(*            | (st', Rerr err) => (st', Rerr err) *)
-(*            end *)
-(*       else (st, Rerr (Rabort Rtype_error)) *)
-
-(*     | [Dletrec locs funs] => (st, *)
-(*                              if NoDuplicates_dec string_dec (map (fun x => fst (fst x)) funs) *)
-(*                              then Rval {| sev := build_rec_env funs env nsEmpty; sec := nsEmpty |} *)
-(*                              else Rerr (Rabort Rtype_error)) *)
-
-(*     | [Dtype locs tds] => if UniqueCtorsInDefs_dec tds *)
-(*                          then (state_update_next_type_stamp st (next_type_stamp st + List.length tds), *)
-(*                                Rval {| sev := nsEmpty; sec := build_tdefs (next_type_stamp st) tds |}) *)
-(*                          else (st, Rerr (Rabort Rtype_error)) *)
-    (* | [Dtabbrev locs tvs tn t] => (st, Rval {| sev := nsEmpty; sec := nsEmpty |}) *)
-    (* | [Dexn locs cn ts] => (state_update_next_exn_stamp st (next_exn_stamp st + 1), *)
-    (*                        Rval {| sev := nsEmpty; *)
-    (*                                sec := nsSing cn (List.length ts, ExnStamp (next_exn_stamp st)) |}) *)
-    (* | [Dmod mn ds] => match evaluate_decs fuel' st env ds with *)
-    (*                  | (st', r) => (st', *)
-    (*                                match r with *)
-    (*                                | Rval env' => Rval {| sev := nsLift mn (sev env'); *)
-    (*                                                      sec := nsLift mn (sec env') |} *)
-    (*                                | Rerr err => Rerr err *)
-    (*                                end) *)
-    (*                  end *)
-    (* | [Dlocal lds ds] => match evaluate_decs fuel' st env lds with *)
-    (*                     | (st1, Rval env1) => *)
-    (*                       evaluate_decs fuel' st1 (extend_dec_env env1 env) ds *)
-    (*                     | res => res *)
-    (*                     end *)
-    (* end. *)
-(* Obligation 1. *)
-
-(* unfold size_decs. simpl. *)
-
-(* assert (fold_addition_lt : forall (l : list nat) (n m : nat), n < m -> n < fold_left plus l m). *)
-(*     (induction l; intros n m H; try (specialize (IHl n (m+a))); simpl; omega). *)
-
-(* pose size_dec_min_1 as H. *)
-
-(* destruct d1; simpl; *)
-(* try (apply fold_addition_lt; *)
-(* specialize (size_dec_min_1 d2); omega). *)
-(* Qed. *)
-(* Obligation 2. *)
-(* unfold size_decs. simpl. *)
-(* assert (fold_addition_lt : forall (l : list nat) (m n : nat), m < m + n -> fold_left plus l m < fold_left plus l (m + n)). *)
-(* induction l; intros m n H. *)
-(* simpl; omega. *)
-(* simpl. rewrite <- (plus_assoc m n a). rewrite (plus_comm n a). rewrite (plus_assoc m a n). *)
-(* apply IHl. omega. *)
-
-(* rewrite plus_comm. *)
-(* apply fold_addition_lt. *)
-(* specialize (size_dec_min_1 d2). *)
-(* specialize (size_dec_min_1 d1). *)
-(* omega. *)
-(* Qed. *)
