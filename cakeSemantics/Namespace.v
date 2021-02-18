@@ -7,6 +7,12 @@ Require Import CakeSem.Utils.
 
 Definition alist (X Y : Type) := list (X * Y).
 
+Fixpoint range {K V : Type} (l : alist K V) : list V :=
+  match l with
+  | [] => []
+  | (k,v)::l' => v::(range l')
+  end.
+
 (* Comes from somewhere else in Lem semantics *)
 Inductive ident (X:Type) (Y:Type) : Type :=
   | Short : Y -> ident X Y
@@ -100,23 +106,31 @@ Definition nsSing {M N V : Type} (n : N) (v : V) : namespace M N V :=
 
 (* LATER: fix this difference *)
 (* First difference here. Using Prop instead of bool. *)
-(* Definition nsSub {M N V1 V2 : Type} *)
-(*            (rel : ident M N -> V1 -> V2 -> Prop) *)
-(*            (ns1 : namespace M N V1) *)
-(*            (ns2 : namespace M N V2) : Prop := *)
-(*      (forall (id : ident M N) (v1 : V1), nsLookup id ns1 = Some v1 -> *)
-(*        exists (v2 : V2), nsLookup id ns2 = Some v2 /\ rel id v1 v2) *)
-(*   /\ (forall (id : ident M N), nsLookup id ns1 = None -> nsLookup id ns2 = None). *)
+Definition nsSub {M N V1 V2 : Type}
+           (dec : forall (x y : ident M N), {x=y} + {x<>y})
+           (rel : ident M N -> V1 -> V2 -> Prop)
+           (ns1 : namespace M N V1)
+           (ns2 : namespace M N V2) : Prop :=
+     (forall (id : ident M N) (v1 : V1), nsLookup dec id ns1 = Some v1 ->
+       exists (v2 : V2), nsLookup dec id ns2 = Some v2 /\ rel id v1 v2)
+  /\ (forall (id : ident M N), nsLookup dec id ns1 = None -> nsLookup dec id ns2 = None).
 
-(* Definition nsAll {M N V : Type} `{EqDec M eq} `{EqDec N eq} `{EqDec V} *)
-(*            (rel : ident M N -> V -> Prop) *)
-(*            (ns : namespace M N V) : Prop := *)
-(*   (forall (id : ident M N) (v : V), *)
-(*      nsLookup id ns = Some v -> rel id v). *)
+Definition nsAll {M N V : Type} (dec : forall (x y : ident M N), {x=y} + {x<>y})
+           (rel : ident M N -> V -> Prop)
+           (ns : namespace M N V) : Prop :=
+  (forall (id : ident M N) (v : V),
+     nsLookup dec id ns = Some v -> rel id v).
 
 (* Definition eAll2 {M N V1 V2 : Type} (rel : ident M N -> V1 -> V2 -> Prop) *)
 (*   (ns1 : namespace M N V1) (ns2 : namespace M N V2) : Prop := *)
 (*   nsSub rel ns1 ns2 /\ nsSub (fun x y z => rel x z y) ns2 ns1. *)
+
+Definition nsAll2 {M N V1 V2 : Type} (dec : forall (x y : ident M N), {x=y} + {x<>y})
+           (rel : ident M N -> V1 -> V2 -> Prop)
+           (ns1 : namespace M N V1)
+           (ns2 : namespace M N V2) : Prop :=
+  nsSub dec rel ns1 ns2 /\
+  nsSub dec (fun x y z => rel x z y) ns2 ns1.
 
 Definition extractIds {M N V : Type} (ns : namespace M N V) : list (ident M N) :=
   map fst ns.

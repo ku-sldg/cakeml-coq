@@ -94,12 +94,12 @@ Fixpoint optimize_sem_env {V : Type} (env : sem_env V) (fvs : list (ident modN v
 Unset Elimination Schemes.
 
 Inductive val : Type :=
-  | Litv : lit -> val
+  (* | Litv : lit -> val *)
   | Conv : option stamp -> list val -> val
   | Closure : sem_env val -> varN -> exp -> val
   | Recclosure : sem_env val -> list (varN * varN * exp) -> varN -> val
-  | Loc : nat -> val
-  | Vectorv : list val -> val.
+  (* | Loc : nat -> val *)
+  (* | Vectorv : list val -> val. *).
 
 Set Elimination Schemes.
 Definition env_val := namespace modN varN val.
@@ -276,19 +276,56 @@ Definition lit_same_type (l1 l2 : lit) : bool :=
     | _, _ => false
   end.
 
-Definition stamp_same_type (s1 s2 : stamp) : bool :=
-  match s1, s2 with
-  | TypeStamp _ n1, TypeStamp _ n2 => if Peano_dec.eq_nat_dec n1 n2 then true else false
-  | ExnStamp _, ExnStamp _ => true
-  | _, _ => false
-  end.
+Print TypeStamp.
 
-Definition ctor_same_type (c1 c2 : option stamp) : bool :=
-  match c1, c2 with
-    | None, None => true
-    | Some stamp1, Some stamp2 => stamp_same_type stamp1 stamp2
-    | _, _ => false
-end.
+Inductive stamp_same_type : stamp -> stamp -> Prop :=
+| TypeStampSame : forall n nm1 nm2, stamp_same_type (TypeStamp nm1 n) (TypeStamp nm2 n)
+| ExnStampSame : forall n m, stamp_same_type (ExnStamp n) (ExnStamp m).
+
+Theorem stamp_same_type_dec : forall s1 s2, {stamp_same_type s1 s2} + {not (stamp_same_type s1 s2)}.
+Proof.
+  induction s1; destruct s2.
+  - destruct (Nat.eq_dec n n0); subst.
+    + left. constructor.
+    + right. intros contra. inv contra. congruence.
+  - right. intros contra. inv contra.
+  - right. intros contra. inv contra.
+  - left. constructor.
+Defined.
+
+(* Definition stamp_same_type (s1 s2 : stamp) : bool := *)
+(*   match s1, s2 with *)
+(*   | TypeStamp _ n1, TypeStamp _ n2 => if Peano_dec.eq_nat_dec n1 n2 then true else false *)
+(*   | ExnStamp _, ExnStamp _ => true *)
+(*   | _, _ => false *)
+(*   end. *)
+
+Inductive ctor_same_type : option stamp -> option stamp -> Prop :=
+| CtorNoneSame : ctor_same_type None None
+| CtorSomeSame : forall s1 s2, stamp_same_type s1 s2 ->
+                          ctor_same_type (Some s1) (Some s2).
+
+Theorem ctor_same_type_dec : forall o1 o2, {ctor_same_type o1 o2} + {not (ctor_same_type o1 o2)}.
+Proof.
+  intros. destruct o1; destruct o2; try (destruct s; destruct s0).
+  - destruct (Nat.eq_dec n n0).
+    + subst. left. constructor. constructor.
+    + subst. right. intro contra. inv contra.
+      inv H1. congruence.
+  - right. intro contra. inv contra. inv H1.
+  - right. intro contra. inv contra. inv H1.
+  - left. constructor. constructor.
+  - right. intro contra. inv contra.
+  - right. intro contra. inv contra.
+  - left. constructor.
+Defined.
+
+(* Definition ctor_same_type (c1 c2 : option stamp) : bool := *)
+(*   match c1, c2 with *)
+(*     | None, None => true *)
+(*     | Some stamp1, Some stamp2 => stamp_same_type stamp1 stamp2 *)
+(*     | _, _ => false *)
+(* end. *)
 
 (** [con_check cenv o l] asserts that the constructor (or None for a tuple) admits arity [l].
     (Note that tuples admit any arity.)
@@ -300,7 +337,6 @@ Inductive con_check (cenv : env_ctor) : constr_id -> nat -> Prop :=
   | con_check_some : forall n l s,
       nsLookup (ident_eq_dec _ _ string_dec string_dec) n cenv = Some (l,s) ->
       con_check cenv (Some n) l.
-
 
 (* ---------------------------------------------------------------------- *)
 (** ** Operations on the store *)
@@ -462,23 +498,23 @@ Fixpoint val_to_char_list (v : val) : option (list char) :=
   | Conv (Some stamp) [] => if stamp_eq_dec stamp (TypeStamp "[]" list_type_num)
                            then Some []
                            else None
-  | Conv (Some stamp) [Litv (CharLit c); v'] =>
-    if stamp_eq_dec stamp (TypeStamp "::" list_type_num)
-    then match val_to_char_list v' with
-         | Some cs => Some (c::cs)
-         | None => None
-         end
-    else None
+  (* | Conv (Some stamp) [Litv (CharLit c); v'] => *)
+  (*   if stamp_eq_dec stamp (TypeStamp "::" list_type_num) *)
+  (*   then match val_to_char_list v' with *)
+  (*        | Some cs => Some (c::cs) *)
+  (*        | None => None *)
+  (*        end *)
+  (*   else None *)
   | _ => None
   end.
 
 Fixpoint vals_to_string (vs : list val) : option String.string :=
   match vs with
   | [] => Some ""
-  | (Litv (StrLit s1))::vs' => match vals_to_string vs' with
-                             | Some s2 => Some (String.append s1 s2)
-                             | None => None
-                             end
+  (* | (Litv (StrLit s1))::vs' => match vals_to_string vs' with *)
+  (*                            | Some s2 => Some (String.append s1 s2) *)
+  (*                            | None => None *)
+  (*                            end *)
   | _ => None
   end.
 
@@ -514,17 +550,17 @@ Close Scope Z_scope.
 (** ** Induction for values *)
 
 Fixpoint val_rect (P : val -> Type)
-         (H1 : forall (l : lit), P (Litv l))
+         (* (H1 : forall (l : lit), P (Litv l)) *)
          (H2 : forall (o : option stamp) (l : list val), Forall''  P l -> P (Conv o l))
          (H3 : forall (s : sem_env val) (n : varN) (e : exp), Forall'' (fun p => P (snd p)) (sev s) -> P (Closure s n e))
          (H4 : forall (s : sem_env val) (l : list (varN * varN * exp)) (n : varN), Forall'' (fun p => P (snd p)) (sev s) ->
                                                                             P (Recclosure s l n))
-         (H5 : forall (n : nat), P (Loc n))
-         (H6 : forall (l : list val), Forall'' P l -> P (Vectorv l))
+         (* (H5 : forall (n : nat), P (Loc n)) *)
+         (* (H6 : forall (l : list val), Forall'' P l -> P (Vectorv l)) *)
          (v : val) : P v :=
-  let val_rect' := @val_rect P H1 H2 H3 H4 H5 H6 in
+  let val_rect' := @val_rect P H2 H3 H4 in
   match v with
-  | Litv l => H1 l
+  (* | Litv l => H1 l *)
   | Conv o l => let fix loop (l : list val) :=
                    match l with
                    | [] => Forall_nil'' val P
@@ -548,14 +584,14 @@ Fixpoint val_rect (P : val -> Type)
                            end
                        in
                        H4 s l n (loop__ns (sev s))
-  | Loc n => H5 n
-  | Vectorv l => let fix loop (l : list val) :=
-                    match l with
-                    | [] => Forall_nil'' val P
-                    | h::t => Forall_cons'' val P h t (val_rect' h) (loop t)
-                    end
-                in
-                H6 l (loop l)
+  (* | Loc n => H5 n *)
+  (* | Vectorv l => let fix loop (l : list val) := *)
+  (*                   match l with *)
+  (*                   | [] => Forall_nil'' val P *)
+  (*                   | h::t => Forall_cons'' val P h t (val_rect' h) (loop t) *)
+  (*                   end *)
+  (*               in *)
+  (*               H6 l (loop l) *)
   end.
 
 Definition val_ind (P : val -> Prop) := @val_rect P.
@@ -613,12 +649,13 @@ Proof.
     right; intro con; inversion con; auto.
     right; intro con; inversion con; auto.
     right; intro con; inversion con; auto.
-  - generalize dependent l0. induction l; destruct l0; try (left; reflexivity); try (right; discriminate).
-    inversion X; subst; clear X. destruct (X0 v); destruct (IHl X1 l0); subst; try (right; discriminate); try (left; reflexivity).
-    right; injection; assumption.
-    right; injection; assumption.
-    right; injection. intro. assumption.
 Defined.
+(*   - generalize dependent l0. induction l; destruct l0; try (left; reflexivity); try (right; discriminate). *)
+(*     inversion X; subst; clear X. destruct (X0 v); destruct (IHl X1 l0); subst; try (right; discriminate); try (left; reflexivity). *)
+(*     right; injection; assumption. *)
+(*     right; injection; assumption. *)
+(*     right; injection. intro. assumption. *)
+(* Defined. *)
 
 Lemma UniqueCtorsInDef_dec : forall (td : (list tvarN * typeN * list (conN * list ast_t))),
     {UniqueCtorsInDef td} + {~ UniqueCtorsInDef td}.

@@ -9,3 +9,5 @@ CakeAST.v
 FreeVars.v
 SemanticsAux.v
 Evaluate.v
+TypeSystem.v
+ValueTypes.v
