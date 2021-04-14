@@ -1,0 +1,6 @@
+BasisPlus.vo BasisPlus.glob BasisPlus.v.beautified BasisPlus.required_vo: BasisPlus.v ../../cakeSemantics/ffi/FFI.vo ../../cakeSemantics/Namespace.vo ../../cakeSemantics/CakeAST.vo ../../cakeSemantics/SemanticsAux.vo
+BasisPlus.vio: BasisPlus.v ../../cakeSemantics/ffi/FFI.vio ../../cakeSemantics/Namespace.vio ../../cakeSemantics/CakeAST.vio ../../cakeSemantics/SemanticsAux.vio
+BasisPlus.vos BasisPlus.vok BasisPlus.required_vos: BasisPlus.v ../../cakeSemantics/ffi/FFI.vos ../../cakeSemantics/Namespace.vos ../../cakeSemantics/CakeAST.vos ../../cakeSemantics/SemanticsAux.vos
+BasisEvaluated.vo BasisEvaluated.glob BasisEvaluated.v.beautified BasisEvaluated.required_vo: BasisEvaluated.v ../../cakeSemantics/Utils.vo ../../cakeSemantics/ffi/FFI.vo ../../cakeSemantics/Namespace.vo ../../cakeSemantics/CakeAST.vo ../../cakeSemantics/SemanticsAux.vo
+BasisEvaluated.vio: BasisEvaluated.v ../../cakeSemantics/Utils.vio ../../cakeSemantics/ffi/FFI.vio ../../cakeSemantics/Namespace.vio ../../cakeSemantics/CakeAST.vio ../../cakeSemantics/SemanticsAux.vio
+BasisEvaluated.vos BasisEvaluated.vok BasisEvaluated.required_vos: BasisEvaluated.v ../../cakeSemantics/Utils.vos ../../cakeSemantics/ffi/FFI.vos ../../cakeSemantics/Namespace.vos ../../cakeSemantics/CakeAST.vos ../../cakeSemantics/SemanticsAux.vos
