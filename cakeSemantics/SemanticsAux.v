@@ -61,6 +61,9 @@ Record sem_env (V : Type) := {
 Arguments sev {V} _.
 Arguments sec {V} _.
 
+Theorem sem_env_id : forall (V : Type) (env : sem_env V), env = {| sev := sev env; sec := sec env|}.
+Proof. destruct env; reflexivity.  Qed.
+
 (** Auxiliary definition to mimic [{ env with sev = .. }] *)
 Definition update_sev V (e:sem_env V) (x:namespace modN varN V) :=
   {| sev := x; sec := sec e |}.
@@ -80,11 +83,14 @@ Definition extend_dec_env (V : Type) (new_env env : sem_env V) : sem_env V :=
 
 Fixpoint optimize_sem_env {V : Type} (env : sem_env V) (fvs : list (ident modN varN)) : sem_env V :=
   match fvs with
-    | [] => {| sec := sec env; sev := nsEmpty |}
+    | [] => {| sec := nsEmpty; sev := nsEmpty |}
     | id::fvs' => let opt := optimize_sem_env env fvs' in
-                match nsLookup (ident_eq_dec _ _ string_dec string_dec) id (sev env) with
-                | None => opt
-                | Some v => {| sec := sec opt; sev := (id,v)::(sev opt) |}
+                match nsLookup (ident_eq_dec _ _ string_dec string_dec) id (sev env),
+                      nsLookup (ident_eq_dec _ _ string_dec string_dec) id (sec env) with
+                | Some v, Some v' => {| sec := (id, v')::(sec opt); sev := (id,v)::(sev opt) |}
+                | Some v, _       => {| sec := sec opt; sev := (id,v)::(sev opt) |}
+                | _, Some v'      => {| sec := (id, v')::(sec opt); sev := sev opt |}
+                | _, _ => opt
                 end
   end.
 
@@ -94,7 +100,7 @@ Fixpoint optimize_sem_env {V : Type} (env : sem_env V) (fvs : list (ident modN v
 Unset Elimination Schemes.
 
 Inductive val : Type :=
-  (* | Litv : lit -> val *)
+  | Litv : lit -> val
   | Conv : option stamp -> list val -> val
   | Closure : sem_env val -> varN -> exp -> val
   | Recclosure : sem_env val -> list (varN * varN * exp) -> varN -> val
@@ -275,8 +281,6 @@ Definition lit_same_type (l1 l2 : lit) : bool :=
     | Word64Lit _, Word64Lit _ => true
     | _, _ => false
   end.
-
-Print TypeStamp.
 
 Inductive stamp_same_type : stamp -> stamp -> Prop :=
 | TypeStampSame : forall n nm1 nm2, stamp_same_type (TypeStamp nm1 n) (TypeStamp nm2 n)
@@ -550,7 +554,7 @@ Close Scope Z_scope.
 (** ** Induction for values *)
 
 Fixpoint val_rect (P : val -> Type)
-         (* (H1 : forall (l : lit), P (Litv l)) *)
+         (H1 : forall (l : lit), P (Litv l))
          (H2 : forall (o : option stamp) (l : list val), Forall''  P l -> P (Conv o l))
          (H3 : forall (s : sem_env val) (n : varN) (e : exp), Forall'' (fun p => P (snd p)) (sev s) -> P (Closure s n e))
          (H4 : forall (s : sem_env val) (l : list (varN * varN * exp)) (n : varN), Forall'' (fun p => P (snd p)) (sev s) ->
@@ -558,9 +562,9 @@ Fixpoint val_rect (P : val -> Type)
          (* (H5 : forall (n : nat), P (Loc n)) *)
          (* (H6 : forall (l : list val), Forall'' P l -> P (Vectorv l)) *)
          (v : val) : P v :=
-  let val_rect' := @val_rect P H2 H3 H4 in
+  let val_rect' := @val_rect P H1 H2 H3 H4 in
   match v with
-  (* | Litv l => H1 l *)
+  | Litv l => H1 l
   | Conv o l => let fix loop (l : list val) :=
                    match l with
                    | [] => Forall_nil'' val P

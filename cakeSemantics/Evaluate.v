@@ -526,16 +526,21 @@ Fixpoint size_exp (e : exp) : nat :=
       | (_,e)::pes' => 1 + size_exp e + size_pes pes'
       end
   in
+  let fix size_vve (vve : list (varN * varN * exp)) :=
+      match vve with
+      | [] => 0
+      | (_,_,e)::vve' => 1 + size_exp e + size_vve vve'
+      end
+  in
   match e with
-  (* | ELit _  *)| EVar _ => 1
-  | EMat e' pes => 1 + size_exp e' + size_pes pes
-  | EFun _ e'    (* | ERaise e' *)
-  (* | EHandle e' _ *)
-  (* | ELetrec _ e' | ETannot e' _ *)
-  | ELannot e' _ => 1 + size_exp e'
+  | ELit _| EVar _ => 1
+  | EHandle e' pes | EMat e' pes => 1 + size_exp e' + size_pes pes
+  | ELetrec vve e' => 1 + size_exp e' + size_vve vve
+  | EFun _ e' | ERaise e'
+  (* | ETannot e' _ *) | ELannot e' _ => 1 + size_exp e'
   | ECon _ es | EApp _ es => 1 + size_exps es
-  (* | ELet _ e' e'' | ELog _ e' e'' => 1 + size_exp e' + size_exp e'' *)
-  (* | EIf  e' e'' e''' => 1 + size_exp e' + size_exp e'' + size_exp e''' *)
+  | ELet _ e' e'' | ELog _ e' e'' => 1 + size_exp e' + size_exp e''
+  | EIf  e' e'' e''' => 1 + size_exp e' + size_exp e'' + size_exp e'''
   end.
 
 Fixpoint size_exps (es : list exp) : nat :=
@@ -624,7 +629,6 @@ Qed.
 
 Require Import Coq.Wellfounded.Lexicographic_Product.
 Require Import Relation_Operators.
-Print lexprod.
 Definition lex_f_s := lexprod Rfuel Rsize.
 Definition lex_f_s_wf := (wf_lexprod nat lex_exps Rfuel Rsize Rfuel_wf Rsize_wf).
 
@@ -799,6 +803,23 @@ Equations eval_or_match (sel : bool) (es : if sel then list exp else list (pat *
       end
     | res => res
     end;
+
+  (* DO I NEED TO TYPECHECK HERE? *)
+  (* No. For now. *)
+  eval_or_match true [ERaise e'] fuel st env _ _ =>
+    match eval_or_match true [e'] fuel st env uu uu with
+    | (st', Rval (v::vs)) => (st', Rerr (Rraise v))
+    | res => res
+    end;
+
+  eval_or_match true [EHandle e' l] fuel st env _ _ =>
+    match eval_or_match true [e'] fuel st env uu uu with
+    | (st', Rerr (Rraise v)) => eval_or_match false l fuel st' env v bind_exn_v
+    | res => res
+    end;
+
+  eval_or_match true [ELit l] _ st _ _ _ => (st, Rval [Litv l]);
+
   eval_or_match true [EVar n] _ st env _ _ => match nsLookup ident_string_dec n (sev env) with
                                              | Some v' => (st, Rval [v'])
                                              | None => (st, Rerr (Rabort Rtype_error))
@@ -834,13 +855,58 @@ Equations eval_or_match (sel : bool) (es : if sel then list exp else list (pat *
                             end
     | res => res
     end;
+
+  eval_or_match true [ELog And e1 e2] fuel st env _ _ =>
+    match eval_or_match true [e1] fuel st env uu uu with
+    | (st', Rval (v::vs)) => if val_eq_dec v (Boolv true)
+                           then eval_or_match true [e2] fuel st env uu uu
+                           else if val_eq_dec v (Boolv false)
+                                then (st', Rval [v])
+                                else (st', Rerr (Rabort Rtype_error))
+    | res => res
+    end;
+
+  eval_or_match true [ELog Or e1 e2] fuel st env _ _ =>
+    match eval_or_match true [e1] fuel st env uu uu with
+    | (st', Rval (v::vs)) => if val_eq_dec v (Boolv true)
+                           then (st', Rval [v])
+                           else if val_eq_dec v (Boolv false)
+                                then eval_or_match true [e2] fuel st env uu uu
+                                else (st', Rerr (Rabort Rtype_error))
+    | res => res
+    end;
+
+  eval_or_match true [EIf c t e] fuel st env _ _ =>
+    match eval_or_match true [c] fuel st env uu uu with
+    | (st', Rval [v]) => if val_eq_dec v ConvTrue
+                        then eval_or_match true [t] fuel st' env uu uu
+                        else if val_eq_dec v ConvFalse
+                             then eval_or_match true [e] fuel st' env uu uu
+                             else (st', Rerr (Rabort Rtype_error))
+    | (st', Rval vs) => (st', Rerr (Rabort Rtype_error))
+    | res => res
+    end;
+
   eval_or_match true [EMat e pes] fuel st env v ev =>
       match eval_or_match true [e] fuel st env uu uu with
       | (st', Rval (v'::vs')) =>
         eval_or_match false pes fuel st' env v' bind_exn_v
-
       | res => res
       end;
+
+  eval_or_match true [ELet o e1 e2] fuel st env _ _ =>
+    match eval_or_match true [e1] fuel st env uu uu with
+    | (st', Rval [v]) =>
+      eval_or_match true [e2] fuel st' (update_sev env (nsOptBind o v (sev env))) uu uu
+    | (st', Rval vs) => (st', Rerr (Rabort Rtype_error))
+    | res => res
+    end;
+
+  eval_or_match true [ELetrec funs e] fuel st env _ _ =>
+    if NoDup_dec string_dec (map (fun '(x,y,z) => x) funs)
+    then eval_or_match true [e] fuel st (update_sev env (build_rec_env funs env (sev env))) uu uu
+    else (st, Rerr (Rabort Rtype_error));
+
   eval_or_match true [ELannot e l] fuel st env _ _ => eval_or_match true [e] fuel st env uu uu;
 
   (* evaluate_ match *)
@@ -857,68 +923,92 @@ Equations eval_or_match (sel : bool) (es : if sel then list exp else list (pat *
           | Match_type_error => (st, Rerr (Rabort Rtype_error))
           end)
     else (st, Rerr (Rabort Rtype_error)) }.
+Transparent mutmeasure.
 Obligation 1.
 - constructor.
-  rewrite mutmeasure_equation_1 at 1.
-  assert (H : mutmeasure true [ECon cn es'] = size_exps [ECon cn es']) by (simp mutmeasure; reflexivity).
-  rewrite H.
-  rewrite size_exps_rev.
-  simpl. fold size_exps.
-  lia.
+  simpl. lia.
 Qed.
 Obligation 2.
-- constructor; lia.
+- constructor.
+  lia.
 Qed.
 Obligation 3.
-- constructor; lia.
+- constructor.
+  fold size_pes.
+  lia.
 Qed.
 Obligation 4.
 - constructor.
-  simp mutmeasure.
-  assert (H : mutmeasure true [EMat e pes] = size_exps [EMat e pes]) by (simp mutmeasure; reflexivity).
-  rewrite H.
-  simpl. fold size_pes. lia.
+  rewrite size_exps_rev.
+  fold size_exps.
+  lia.
 Qed.
 Obligation 5.
-- constructor.
-  simp mutmeasure.
-  simpl. fold size_pes.
-  lia.
+- constructor; lia.
 Qed.
 Obligation 6.
-- constructor.
-  simp mutmeasure.
+- constructor; lia.
 Qed.
 Obligation 7.
-- constructor.
-  simp mutmeasure.
-  assert (H : mutmeasure true (e1::e2::es') = size_exps (e1::e2::es')) by (simp mutmeasure; reflexivity).
-  rewrite H.
-  specialize (size_exp_at_least_S e2).
-  intros. simpl. lia.
+- constructor; lia.
 Qed.
 Obligation 8.
-- constructor.
-  specialize (size_exp_at_least_S e1). intro.
-  simp mutmeasure.
-  assert (H' : mutmeasure true (e1::e2::es') = size_exps (e1::e2::es')) by (simp mutmeasure; reflexivity).
-  rewrite H'.
-  simpl. lia.
+- constructor; lia.
 Qed.
 Obligation 9.
-- constructor.
-  simp mutmeasure.
-  assert (H : mutmeasure false ((p,e)::pes') = size_pes ((p,e)::pes')) by (simp mutmeasure; reflexivity).
-  rewrite H.
-  simpl.
-  specialize (size_exp_at_least_S e). intro.
-  lia.
+- constructor; lia.
 Qed.
 Obligation 10.
 - constructor.
-  simp mutmeasure.
-  simpl.
+  fold size_pes.
   lia.
+Qed.
+Obligation 11.
+- constructor.
+  fold size_pes.
+  lia.
+Qed.
+Obligation 12.
+- constructor; lia.
+Qed.
+Obligation 13.
+- constructor; lia.
+Qed.
+Obligation 14.
+- constructor; lia.
+Qed.
+Obligation 15.
+- constructor.
+  fold size_pes.
+  lia.
+Qed.
+Obligation 16.
+- constructor; lia.
+Qed.
+Obligation 17.
+- constructor; lia.
+Qed.
+Obligation 18.
+- constructor; lia.
+Qed.
+Obligation 19.
+- constructor; lia.
+Qed.
+Obligation 20.
+- constructor.
+  specialize (size_exp_at_least_S e2).
+  lia.
+Qed.
+Obligation 21.
+- constructor.
+  specialize (size_exp_at_least_S e1).
+  lia.
+Qed.
+Obligation 22.
+- constructor; lia.
+Qed.
+Obligation 23.
+- constructor; lia.
 Qed.
 
 Lemma Forall''_app : forall (T : Type) (P : T -> Type) (l : list T) (a : T), Forall'' P l -> P a -> Forall'' P (l ++ [a]).
@@ -947,11 +1037,50 @@ Qed.
 Lemma eval_or_match_sing : forall (e : exp) (f : nat) (st st' : state nat) (env : sem_env val) (vs : list val),
     eval_or_match true [e] f st env uu uu = (st', Rval vs) -> exists (v : val), vs = [v].
 Proof.
-  intros e f.
-  revert e.
-  Check exp.
-  Print exp_rect'.
-  induction f; induction e using exp_rect'; intros.
+  (* I feel like this should be solvable inducting on e first and then inducting on  *)
+  intros e f; revert e.
+  induction f;
+  induction e using exp_rect'; intros.
+
+  - simp eval_or_match in H. break_let.
+    break_match; inv H; destruct l; inv H.
+    apply IHe in Heqp. inv Heqp. inv H0.
+
+  - simp eval_or_match in H.
+    induction X.
+    break_let.
+    break_match.
+    apply IHe in Heqp.
+    inv Heqp.
+    inv H.
+    exists x. reflexivity.
+    break_match.
+    simp eval_or_match in H.
+    inv H.
+    inv H.
+    break_let.
+    break_match.
+    apply IHe in Heqp0.
+    inv Heqp0.
+    inv H.
+    exists x0; reflexivity.
+    break_match.
+    clear X.
+    destruct x.
+    simpl in *.
+    simp eval_or_match in H.
+    break_if.
+    break_match.
+    apply IHX.
+    assumption.
+    inv H.
+    apply p in H.
+    assumption.
+    inv H.
+    inv H.
+
+  - simp eval_or_match in H. exists (Litv l). inv H. reflexivity.
+
   - simp eval_or_match in H.
     destruct (do_con_check (sec env) o (Datatypes.length l)).
     break_let.
@@ -967,7 +1096,44 @@ Proof.
    inv H.
    eauto.
 
- - simp eval_or_match in H. simp eval_or_match in H. inv H.
+ (* EApp *)
+ - simp eval_or_match in H. inv H.
+
+ - destruct lo; simp eval_or_match in H.
+   + break_let.
+     break_match.
+     apply IHe1 in Heqp.
+     inv Heqp.
+     break_if.
+     apply IHe2 in H.
+     assumption.
+     break_if.
+     inv H.
+     exists (Boolv false). reflexivity.
+     inv H.
+     inv H.
+   + break_let.
+     break_match.
+     apply IHe1 in Heqp.
+     inv Heqp.
+     break_if.
+     inv H.
+     exists (Boolv true). reflexivity.
+     break_if.
+     apply IHe2 in H. assumption.
+     inv H.
+     inv H.
+
+ - simp eval_or_match in H.
+   break_let.
+   break_match.
+   apply IHe1 in Heqp. destruct Heqp. subst.
+   break_if.
+   apply IHe2 in H. assumption.
+   break_if.
+   apply IHe3 in H. assumption.
+   inv H.
+   inv H.
 
  - simp eval_or_match in H.
    induction X.
@@ -998,6 +1164,61 @@ Proof.
    inv H.
 
  - simp eval_or_match in H.
+   break_let.
+   break_match.
+   apply IHe1 in Heqp. destruct Heqp. subst.
+   apply IHe2 in H. assumption.
+   inv H.
+
+ - simp eval_or_match in H.
+   break_if.
+   eapply IHe.
+   apply H.
+   inv H.
+
+ - simp eval_or_match in H.
+
+ - simp eval_or_match in H.
+   break_let.
+   break_match; inv H.
+   apply IHe in Heqp.
+   inv Heqp.
+   inv H.
+
+ - simp eval_or_match in H.
+   induction X.
+   break_let.
+   break_match.
+   apply IHe in Heqp.
+   inv Heqp.
+   inv H.
+   exists x. reflexivity.
+   break_match.
+   simp eval_or_match in H.
+   inv H.
+   inv H.
+   break_let.
+   break_match.
+   apply IHe in Heqp0.
+   inv Heqp0.
+   inv H.
+   exists x0; reflexivity.
+   break_match.
+   clear X.
+   destruct x.
+   simpl in *.
+   simp eval_or_match in H.
+   break_if.
+   break_match.
+   apply IHX.
+   assumption.
+   inv H.
+   apply p in H.
+   assumption.
+   inv H.
+   inv H.
+
+ - simp eval_or_match in H. inv H. econstructor. reflexivity.
 
  - simp eval_or_match in H.
    destruct (do_con_check (sec env) o (Datatypes.length l)).
@@ -1045,6 +1266,42 @@ Proof.
    inv H.
    inv H.
 
+ - destruct lo; simp eval_or_match in H.
+   + break_let.
+     break_match.
+     apply IHe1 in Heqp.
+     inv Heqp.
+     break_if.
+     apply IHe2 in H.
+     assumption.
+     break_if.
+     inv H.
+     exists (Boolv false). reflexivity.
+     inv H.
+     inv H.
+   + break_let.
+     break_match.
+     apply IHe1 in Heqp.
+     inv Heqp.
+     break_if.
+     inv H.
+     exists (Boolv true). reflexivity.
+     break_if.
+     apply IHe2 in H. assumption.
+     inv H.
+     inv H.
+
+ - simp eval_or_match in H.
+   break_let.
+   break_match.
+   apply IHe1 in Heqp. destruct Heqp. subst.
+   break_if.
+   apply IHe2 in H. assumption.
+   break_if.
+   apply IHe3 in H. assumption.
+   inv H.
+   inv H.
+
  - simp eval_or_match in H.
    break_let.
    destruct r.
@@ -1067,6 +1324,17 @@ Proof.
    inv H.
 
  - simp eval_or_match in H.
+   break_let. break_match.
+   apply IHe1 in Heqp. destruct Heqp. subst.
+   apply IHe2 in H. assumption.
+   inv H.
+
+ - simp eval_or_match in H.
+   break_if.
+   eapply IHe. apply H.
+   inv H.
+
+ - simp eval_or_match in H.
 Qed.
 
 Theorem eval_or_match_true_ignore : forall (st : state nat) (env : sem_env val) (es : list exp) (f : nat)
@@ -1079,6 +1347,7 @@ Proof.
   destruct es; intros; simp eval_or_match; try congruence.
   destruct a; simp eval_or_match; try congruence.
   destruct f; simp eval_or_match; try congruence.
+  destruct l; simp eval_or_match; try congruence.
 Qed.
 
 Theorem eval_or_match_cons : forall (st : state nat) (env : sem_env val) (e : exp) (es : list exp) (f : nat),
@@ -1140,15 +1409,15 @@ Fixpoint evaluate_opt {ffi' : Type} (st : state ffi') (env : sem_env val)
     let fix evaluate_single_exp (st : state ffi') (env : sem_env val) (ex : exp)
         : state ffi' * result (list val) val :=
         match ex with
-        (* | ELit l => (st, Rval [Litv l]) *)
-        (* | ERaise e => match evaluate_single_exp st env e with *)
-        (*              | (st', Rval (v'::vs')) => (st', Rerr (Rraise v')) *)
-        (*              | res => res *)
-        (*              end *)
-        (* | EHandle e pes => match (evaluate_single_exp st env e) with *)
-        (*                   | (st', Rerr (Rraise v')) => evaluate_match st' env v' pes v' *)
-        (*                   | res => res *)
-        (*                   end *)
+        | ELit l => (st, Rval [Litv l])
+        | ERaise e => match evaluate_single_exp st env e with
+                     | (st', Rval (v'::vs')) => (st', Rerr (Rraise v'))
+                     | res => res
+                     end
+        | EHandle e pes => match (evaluate_single_exp st env e) with
+                          | (st', Rerr (Rraise v')) => evaluate_match st' env v' pes v'
+                          | res => res
+                          end
         | ECon cn es' => if do_con_check (sec env) cn (length es')
                         then match (evaluate_opt st env (rev es') fuel') with
                              | (st', Rval vs) => match build_conv (sec env) cn (rev vs) with
@@ -1162,7 +1431,7 @@ Fixpoint evaluate_opt {ffi' : Type} (st : state ffi') (env : sem_env val)
                    | Some v' => (st, Rval [v'])
                    | None => (st, Rerr (Rabort Rtype_error))
                    end
-        | EFun x e => (st, Rval [Closure (optimize_sem_env env (free_vars e)) x e])
+        | EFun x e => (st, Rval [Closure (optimize_sem_env env ((used_cons e) ++ (free_vars e))) x e])
 
         | EApp op es => match (evaluate_opt st env (rev es) fuel') with
                        | (st', Rval vs) =>
@@ -1184,37 +1453,37 @@ Fixpoint evaluate_opt {ffi' : Type} (st : state ffi') (env : sem_env val)
                        | res => res
                        end
 
-        (* | ELog lop e1 e2 => match (evaluate_opt st env [e1] fuel') with *)
-        (*                    | (st', Rval (v1::vs1)) => match do_log lop v1 e2 with *)
-        (*                                             | Some (Exp e) => (evaluate_opt st' env [e] fuel') *)
-        (*                                             | Some (Val v') => (st', Rval [v']) *)
-        (*                                             | None => (st', Rerr (Rabort Rtype_error)) *)
-        (*                                             end *)
-        (*                    | res => res *)
-        (*                    end *)
+        | ELog lop e1 e2 => match (evaluate_opt st env [e1] fuel') with
+                           | (st', Rval (v1::vs1)) => match do_log lop v1 e2 with
+                                                    | Some (Exp e) => (evaluate_opt st' env [e] fuel')
+                                                    | Some (Val v') => (st', Rval [v'])
+                                                    | None => (st', Rerr (Rabort Rtype_error))
+                                                    end
+                           | res => res
+                           end
 
-        (* | EIf e1 e2 e3 => match (evaluate_opt st env [e1] fuel') with *)
-        (*                  | (st', Rval (v'::vs')) => match do_if v' e2 e3 with *)
-        (*                                           | Some e => (evaluate_opt st' env [e] fuel') *)
-        (*                                           | None => (st', Rerr (Rabort Rtype_error)) *)
-        (*                                           end *)
-        (*                  | res => res *)
-        (*                  end *)
+        | EIf e1 e2 e3 => match (evaluate_opt st env [e1] fuel') with
+                         | (st', Rval (v'::vs')) => match do_if v' e2 e3 with
+                                                  | Some e => (evaluate_opt st' env [e] fuel')
+                                                  | None => (st', Rerr (Rabort Rtype_error))
+                                                  end
+                         | res => res
+                         end
 
         | EMat e pes => match (evaluate_opt st env [e] fuel') with
                        | (st', Rval (v'::vs')) => evaluate_match st' env v' pes bind_exn_v
                        | res => res
                        end
 
-        (* | ELet xo e1 e2 => match (evaluate_opt st env [e1] fuel') with *)
-        (*                   | (st', Rval (v'::vs')) => (evaluate_opt st' *)
-        (*                                                          {| sev := nsOptBind xo v' (sev env); sec := (sec env) |} [e2] fuel') *)
-        (*                   | res => res *)
-        (*                   end *)
+        | ELet xo e1 e2 => match (evaluate_opt st env [e1] fuel') with
+                          | (st', Rval (v'::vs')) => (evaluate_opt st'
+                                                                 {| sev := nsOptBind xo v' (sev env); sec := (sec env) |} [e2] fuel')
+                          | res => res
+                          end
 
-        (* | ELetrec funs e =>  if NoDuplicates_dec (pair_eq_dec _ _ (pair_eq_dec _ _ string_dec string_dec) exp_eq_dec) funs *)
-        (*                     then (evaluate_opt st {| sev := build_rec_env funs env (sev env); sec := (sec env) |} [e] fuel') *)
-        (*                     else (st, Rerr (Rabort Rtype_error)) *)
+        | ELetrec funs e =>  if NoDuplicates_dec (pair_eq_dec _ _ (pair_eq_dec _ _ string_dec string_dec) exp_eq_dec) funs
+                            then (evaluate_opt st {| sev := build_rec_env funs env (sev env); sec := (sec env) |} [e] fuel')
+                            else (st, Rerr (Rabort Rtype_error))
 
         (* | ETannot e t => (evaluate_opt st env [e] fuel') *)
         | ELannot e l => (evaluate_opt st env [e] fuel')
@@ -1239,10 +1508,10 @@ Fixpoint size_dec (d : dec) : nat :=
   | Dlet _ _ _ => 1
   | Dletrec _ _ => 1
   | Dtype _ _ => 1
-  (* | Dtabbrev _ _ _ _ => 1 *)
-  (* | Dexn _ _ _ => 1 *)
-  (* | Dmod _ ds => 1 + fold_left plus (List.map size_dec ds) O *)
-  (* | Dlocal lds ds => 1 + fold_left plus (List.map size_dec ds) O + fold_left plus (List.map size_dec lds) O *)
+  | Dtabbrev _ _ _ _ => 1
+  | Dexn _ _ _ => 1
+  | Dmod _ ds => 1 + fold_left plus (List.map size_dec ds) O
+  | Dlocal lds ds => 1 + fold_left plus (List.map size_dec ds) O + fold_left plus (List.map size_dec lds) O
   end.
 
 Definition size_decs (ds : list dec) : nat := fold_left plus (map size_dec ds) O.
@@ -1255,6 +1524,7 @@ Qed.
 Equations evaluate_decs {ffi' : Type} (fuel : nat) (st : state ffi') (env : sem_env val) (decl : list dec)
   : state ffi' * result (sem_env val) val by wf (size_decs decl) := {
     evaluate_decs _ st _ [] => (st, Rval empty_sem_env);
+
     evaluate_decs fuel st env (d1::d2::decl') =>
         match evaluate_decs fuel st env [d1] with
         | (st1, Rval env1) =>
@@ -1263,6 +1533,7 @@ Equations evaluate_decs {ffi' : Type} (fuel : nat) (st : state ffi') (env : sem_
           end
         | res => res
         end;
+
     evaluate_decs fuel st env [Dlet locs p e] =>
         if NoDuplicates_dec string_dec (pat_bindings p)
         then match evaluate_opt st env [e] fuel with
@@ -1275,17 +1546,50 @@ Equations evaluate_decs {ffi' : Type} (fuel : nat) (st : state ffi') (env : sem_
              | (st', Rerr err) => (st', Rerr err)
              end
         else (st, Rerr (Rabort Rtype_error));
+
     evaluate_decs fuel st env [Dletrec locs funs] =>
         (st,
          if NoDuplicates_dec string_dec (map (fun x => fst (fst x)) funs)
          then Rval {| sev := build_rec_env funs env nsEmpty; sec := nsEmpty |}
          else Rerr (Rabort Rtype_error));
+
     evaluate_decs fuel st env [Dtype locs tds] =>
         if UniqueCtorsInDefs_dec tds
         then (state_update_next_type_stamp st (next_type_stamp st + List.length tds),
               Rval {| sev := nsEmpty; sec := build_tdefs (next_type_stamp st) tds |})
-        else (st, Rerr (Rabort Rtype_error)) }.
-Obligation 1.
+        else (st, Rerr (Rabort Rtype_error));
+
+    evaluate_decs fuel st env [Dtabbrev _ _ _ _] => (st, Rval {| sev := nsEmpty; sec := nsEmpty |});
+
+    evaluate_decs fuel st env [Dexn locs cn ts] =>
+      (state_update_next_exn_stamp st ((next_exn_stamp st) + 1),
+       Rval {| sev := nsEmpty; sec := nsSing cn (length ts, ExnStamp (next_exn_stamp st)) |});
+
+    evaluate_decs fuel st env [Dmod mn ds] =>
+        match evaluate_decs fuel st env ds with
+        | (st', Rval env') => (st', Rval {| sev := nsLift mn (sev env'); sec := nsLift mn (sec env') |})
+        | res => res
+        end;
+
+    evaluate_decs fuel st env [Dlocal ds1 ds2] =>
+        match evaluate_decs fuel st env ds1 with
+        | (st1, Rval env1) =>
+          evaluate_decs fuel st1 (extend_dec_env env1 env) ds2
+        | res => res
+        end
+
+     }.
+Obligation 2.
+unfold size_decs.
+simpl.
+lia.
+Qed.
+Obligation 3.
+unfold size_decs.
+simpl.
+lia.
+Qed.
+Obligation 4.
 unfold size_decs. simpl.
 assert (fold_addition_lt : forall (l : list nat) (n m : nat), n < m -> n < fold_left plus l m).
     (induction l; intros n m H; try (specialize (IHl n (m+a))); simpl; lia).
@@ -1294,7 +1598,7 @@ destruct d1; simpl;
 try (apply fold_addition_lt;
 specialize (size_dec_min_1 d2); lia).
 Qed.
-Obligation 2.
+Obligation 5.
 unfold size_decs. simpl.
 assert (fold_addition_lt : forall (l : list nat) (m n : nat), m < m + n -> fold_left plus l m < fold_left plus l (m + n)).
 induction l; intros m n H.
@@ -1306,4 +1610,127 @@ apply fold_addition_lt.
 specialize (size_dec_min_1 d2).
 specialize (size_dec_min_1 d1).
 lia.
+Qed.
+
+
+Theorem evaluate_decs_cons : forall (fuel : nat) (st : state nat) (env : sem_env val) (d : dec) (ds : list dec),
+   evaluate_decs fuel st env (d::ds) =
+     match evaluate_decs fuel st env [d] with
+     | (s1, Rval env1) =>
+       match evaluate_decs fuel s1 (extend_dec_env env1 env) ds with
+       | (s2, r) => (s2, combine_dec_result env1 r)
+       end
+     | err => err
+     end.
+Proof.
+  intros.
+  destruct ds.
+  break_let.
+  break_match.
+  break_let.
+  simp evaluate_decs in Heqp0.
+  inv Heqp0.
+  simpl.
+  unfold extend_dec_env.
+  simpl.
+  destruct s0. simpl.
+  reflexivity.
+  reflexivity.
+  simp evaluate_decs.
+  reflexivity.
+Qed.
+
+Theorem evaluate_decs_app : forall (fuel : nat) (st : state nat) (env : sem_env val) (ds1 ds2 : list dec),
+   evaluate_decs fuel st env (ds1 ++ ds2) =
+     match evaluate_decs fuel st env ds1 with
+     | (s1, Rval env1) =>
+       match evaluate_decs fuel s1 (extend_dec_env env1 env) ds2 with
+       | (s2, r) => (s2, combine_dec_result env1 r)
+       end
+     | err => err
+     end.
+Proof.
+  intros. revert fuel st env ds2.
+  induction ds1.
+  - intros. simpl.
+    simp evaluate_decs.
+    unfold combine_dec_result.
+    unfold extend_dec_env.
+    rewrite (sem_env_id env).
+    simpl.
+    break_let.
+    break_match.
+    + unfold nsAppend.
+      unfold nsEmpty.
+      rewrite app_nil_r.
+      rewrite app_nil_r.
+      rewrite (sem_env_id s0).
+      reflexivity.
+    + reflexivity.
+  - intros. simpl.
+    rewrite evaluate_decs_cons.
+    destruct (evaluate_decs fuel st env [a]) eqn:eval1.
+    rewrite evaluate_decs_cons.
+    rewrite eval1.
+    destruct r.
+    rewrite IHds1.
+    unfold extend_dec_env.
+    unfold nsAppend.
+    simpl.
+    destruct
+      (evaluate_decs fuel s {| sev := sev s0 ++ sev env; sec := sec s0 ++ sec env |} ds1) eqn:eval2.
+    destruct r.
+    destruct s0.
+    simpl.
+    unfold nsAppend.
+    simpl.
+    rewrite app_assoc_reverse.
+    rewrite app_assoc_reverse.
+    destruct (evaluate_decs fuel s1
+         {|
+         sev := SemanticsAux.sev s2 ++ sev ++ SemanticsAux.sev env;
+         sec := SemanticsAux.sec s2 ++ sec ++ SemanticsAux.sec env |} ds2).
+    unfold combine_dec_result.
+    unfold extend_dec_env.
+    simpl.
+    unfold nsAppend.
+    simpl.
+    destruct r.
+    simpl.
+    rewrite app_assoc_reverse.
+    rewrite app_assoc_reverse.
+    reflexivity.
+    reflexivity.
+    destruct s0.
+    simpl.
+    reflexivity.
+    reflexivity.
+Qed.
+
+Theorem evaluate_decs_app' : forall (fuel : nat) (st st' st'' : state nat) (env env' env'' : sem_env val) (ds1 ds2 : list dec),
+    evaluate_decs fuel st env ds1 = (st', Rval env') ->
+    evaluate_decs fuel st' (extend_dec_env env' env) ds2 = (st'', Rval env'') ->
+    evaluate_decs fuel st env (ds1 ++ ds2) = (st'', Rval (extend_dec_env env'' env')).
+Proof.
+  intros.
+  rewrite evaluate_decs_app.
+  rewrite H.
+  rewrite H0.
+  simpl.
+  reflexivity.
+Qed.
+
+Theorem evaluate_decs_cons' : forall (fuel : nat) (st st' st'' : state nat) (env env' env'' : sem_env val) (d : dec) (ds : list dec),
+    evaluate_decs fuel st env [d] = (st', Rval env') ->
+    evaluate_decs fuel st' (extend_dec_env env' env) ds = (st'', Rval env'') ->
+    evaluate_decs fuel st env (d::ds) = (st'', Rval (extend_dec_env env'' env')).
+Proof.
+  intros.
+  assert (d::ds = [d] ++ ds) by reflexivity.
+  rewrite H1.
+  rewrite evaluate_decs_app.
+  rewrite H.
+  rewrite H0.
+  simpl.
+  reflexivity.
 Qed.
