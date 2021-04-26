@@ -89,29 +89,83 @@ Proof.
   reflexivity.
 Qed.
 
+(* Theorem evaluate_0_30_correct : *)
+(*   evaluate_decs 100 init_state init_env (prog_0_26 ++ [dec_def_27; dec_def_28; dec_def_29; dec_def_30]) = *)
+(*   (st_0_26, Rval env_30). *)
+(* Proof. *)
+(*   reflexivity. *)
+(* Qed. *)
+
+Ltac evaluate_decs_one :=
+  match goal with
+  | [|- evaluate_decs _ _ _ [?def] = (_, Rval _)] =>
+    unfold def;
+    match goal with
+    | [|- evaluate_decs _ _ _ [Dmod _ _] = (_, Rval _)]   => erewrite evaluate_decs_Dmod
+    | [|- evaluate_decs _ _ _ [Dlocal _ _] = (_, Rval _)] => erewrite evaluate_decs_Dlocal
+    | [|- evaluate_decs _ _ _ [_] = (_, Rval _)] => simp evaluate_decs
+    end; try reflexivity
+  end.
+
+Ltac evaluate_decs_noapp :=
+  match goal with
+  | [|- evaluate_decs _ _ _ [] = (_, Rval _)] => simp evaluate_decs; reflexivity
+  | [|- evaluate_decs _ _ _ [_] = (_, Rval _)] => evaluate_decs_one
+  | [|- evaluate_decs _ _ _ (?def::_) = (_, Rval _)] =>
+    eapply evaluate_decs_cons'; [evaluate_decs_one | unfold extend_dec_env; simpl]
+  end.
+
 Theorem evaluate_30 : exists env st,
     evaluate_decs 100 st_0_26 env_28_29 [dec_def_30; dec_def_31] =
     (st, Rval env).
 Proof.
   econstructor; econstructor.
 
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  (* HERE *)
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
+  evaluate_decs_noapp.
   eapply evaluate_decs_cons'.
-  unfold dec_def_30.
-  erewrite evaluate_decs_Dmod.
-  reflexivity.
+
+  + unfold dec_def_30;
+      erewrite evaluate_decs_Dmod; [reflexivity | simpl].
 
   eapply evaluate_decs_cons'.
-  unfold dec_def_30_0.
-  simp evaluate_decs; simpl.
-  reflexivity.
+  unfold dec_def_30_0;
+    simp evaluate_decs; simpl;
+      reflexivity.
   rewrite extend_empty_l.
 
   eapply evaluate_decs_cons'.
-  unfold dec_def_30_1.
-  simp evaluate_decs; simpl.
-  reflexivity.
+  unfold dec_def_30_1;
+    simp evaluate_decs; simpl;
+      reflexivity.
   unfold extend_dec_env.
-  simpl.
+      simpl.
 
   eapply evaluate_decs_cons'.
   unfold dec_def_30_2.
@@ -303,8 +357,6 @@ Proof.
   erewrite evaluate_decs_Dlocal.
   reflexivity.
 
-  (* I AM HERE *)
-
   unfold dec_def_30_10_3_2_2_2_2_5_0.
   simp evaluate_decs; simpl.
   reflexivity.
@@ -312,43 +364,57 @@ Proof.
   simpl.
 
   eapply evaluate_decs_cons'.
-  unfold dec_def_30_10_3_2_2_2_2_1.
+  unfold dec_def_30_10_3_2_2_2_2_5_1.
   simp evaluate_decs; simpl.
   reflexivity.
   unfold extend_dec_env.
   simpl.
 
   eapply evaluate_decs_cons'.
-  unfold dec_def_30_10_3_2_2_2_2_2.
+  unfold dec_def_30_10_3_2_2_2_2_5_2.
   simp evaluate_decs; simpl.
   reflexivity.
   unfold extend_dec_env.
   simpl.
 
   eapply evaluate_decs_cons'.
-  unfold dec_def_30_10_3_2_2_2_2_3.
+  unfold dec_def_30_10_3_2_2_2_2_5_3.
   simp evaluate_decs; simpl.
   reflexivity.
   unfold extend_dec_env.
   simpl.
 
   eapply evaluate_decs_cons'.
-  unfold dec_def_30_10_3_2_2_2_2_4.
+  unfold dec_def_30_10_3_2_2_2_2_5_4.
   simp evaluate_decs; simpl.
   reflexivity.
   unfold extend_dec_env.
   simpl.
-
-
-  (* I AM HERE *)
 
   eapply evaluate_decs_cons'.
-  unfold dec_def_30_10_3_2_2_2_2_5.
+  unfold dec_def_30_10_3_2_2_2_2_5_5.
   simp evaluate_decs; simpl.
   reflexivity.
   unfold extend_dec_env.
   simpl.
 
+  unfold dec_def_30_10_3_2_2_2_2_5_6.
+  erewrite evaluate_decs_Dlocal.
+  reflexivity.
+
+  unfold dec_def_30_10_3_2_2_2_2_5_6_0.
+  simp evaluate_decs; simpl.
+  reflexivity.
+  unfold extend_dec_env.
+  simpl.
+
+  unfold dec_def_30_10_3_2_2_2_2_5_6_1.
+  simp evaluate_decs; simpl.
+  reflexivity.
+  unfold extend_dec_env at 1.
+  simpl.
+
+Qed.
 
 (* Theorem evaluate_0_26 : exists env st, *)
 (*     evaluate_decs 100 init_state init_env prog_0_26 = *)
