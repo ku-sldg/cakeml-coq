@@ -9,7 +9,7 @@
 
 
 Require Import Arith.PeanoNat.
-Require Import Omega.
+Require Import Lia.
 Require Import ProofIrrelevance.
 
 Inductive word (size : nat) : Type :=
@@ -17,7 +17,7 @@ Inductive word (size : nat) : Type :=
 
 Definition word_equality (s : nat) (w x : word s) : bool :=
   match w, x with
-      | Word _ m _, Word _ n _ => beq_nat m n
+      | Word _ m _, Word _ n _ => EqNat.beq_nat m n
   end.
 
 Lemma word_eq_succ : forall (n0 n1 size : nat) (H0 : n0 < 2 ^ size) (H1 : n1 < 2 ^ size) (P0 : (S n0) < 2 ^ size) (P1 : (S n1) < 2 ^ size),
@@ -117,22 +117,22 @@ Proof.
       * inversion H2. rewrite H3.
         rewrite Nat.div2_double.
         rewrite H3 in H1.
-        assert (0 < 2) by omega.
+        assert (0 < 2) by lia.
         apply (Nat.mul_le_mono_pos_l _ _ 2 H4).
         rewrite  Nat.mul_sub_distr_l.
         rewrite <- H3.
         simpl (2 * 1).
         inversion H1.
-        omega.
-        omega.
+        lia.
+        lia.
 
       * inversion H2. rewrite H3.
         rewrite (Nat.add_comm).
         rewrite Nat.div2_succ_double.
         rewrite H3 in H1.
         inversion H1.
-        omega.
-        omega.
+        lia.
+        lia.
     }
     apply H1 in H.
     apply H1 in H0.
@@ -148,7 +148,7 @@ Proof.
     assert (forall x, S (2 ^ x + 2 ^ x - 2) = (2 ^ x + 2 ^ x - 1)). {
       intros.
       assert (2 <= 2 ^ x + 2 ^ x) by
-          (induction x; simpl; omega).
+          (induction x; simpl; lia).
       rewrite <- (Nat.sub_succ_l _ _ H2).
       reflexivity.
     }
@@ -161,22 +161,22 @@ Proof.
     assert (forall x, S (2 ^ x + 2 ^ x - 2) = (2 ^ x + 2 ^ x - 1)). {
       intros.
       assert (2 <= 2 ^ x + 2 ^ x) by
-          (induction x; simpl; omega).
+          (induction x; simpl; lia).
       rewrite <- (Nat.sub_succ_l _ _ H2).
       reflexivity.
     }
     rewrite H2 in H0.
-    apply H0. omega.
+    apply H0. lia.
 Qed.
 
 Theorem bitwise_max : forall (m n p : nat) (op : bool -> bool -> bool), m < 2^p -> n < 2^p ->
     (Nat.bitwise op p m n) < 2^p.
   intros.
-  assert (2 ^ p = S ( 2 ^ p - 1)) by omega.
+  assert (2 ^ p = S ( 2 ^ p - 1)) by lia.
   rewrite H1 in *.
-  apply le_lt_n_Sm.
-  apply lt_n_Sm_le in H.
-  apply lt_n_Sm_le in H0.
+  apply Lt.le_lt_n_Sm.
+  apply Lt.lt_n_Sm_le in H.
+  apply Lt.lt_n_Sm_le in H0.
   apply bitwise_max_lem; assumption. Qed.
 
 Definition word_and (size : nat) (w1 w2 : word size) : word size :=

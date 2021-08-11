@@ -104,8 +104,8 @@ Inductive val : Type :=
   | Conv : option stamp -> list val -> val
   | Closure : sem_env val -> varN -> exp -> val
   | Recclosure : sem_env val -> list (varN * varN * exp) -> varN -> val
-  (* | Loc : nat -> val *)
-  (* | Vectorv : list val -> val. *).
+  | Loc : nat -> val
+  | Vectorv : list val -> val.
 
 Set Elimination Schemes.
 Definition env_val := namespace modN varN val.
@@ -559,10 +559,10 @@ Fixpoint val_rect (P : val -> Type)
          (H3 : forall (s : sem_env val) (n : varN) (e : exp), Forall'' (fun p => P (snd p)) (sev s) -> P (Closure s n e))
          (H4 : forall (s : sem_env val) (l : list (varN * varN * exp)) (n : varN), Forall'' (fun p => P (snd p)) (sev s) ->
                                                                             P (Recclosure s l n))
-         (* (H5 : forall (n : nat), P (Loc n)) *)
-         (* (H6 : forall (l : list val), Forall'' P l -> P (Vectorv l)) *)
+         (H5 : forall (n : nat), P (Loc n))
+         (H6 : forall (l : list val), Forall'' P l -> P (Vectorv l))
          (v : val) : P v :=
-  let val_rect' := @val_rect P H1 H2 H3 H4 in
+  let val_rect' := @val_rect P H1 H2 H3 H4 H5 H6 in
   match v with
   | Litv l => H1 l
   | Conv o l => let fix loop (l : list val) :=
@@ -588,14 +588,14 @@ Fixpoint val_rect (P : val -> Type)
                            end
                        in
                        H4 s l n (loop__ns (sev s))
-  (* | Loc n => H5 n *)
-  (* | Vectorv l => let fix loop (l : list val) := *)
-  (*                   match l with *)
-  (*                   | [] => Forall_nil'' val P *)
-  (*                   | h::t => Forall_cons'' val P h t (val_rect' h) (loop t) *)
-  (*                   end *)
-  (*               in *)
-  (*               H6 l (loop l) *)
+  | Loc n => H5 n
+  | Vectorv l => let fix loop (l : list val) :=
+                    match l with
+                    | [] => Forall_nil'' val P
+                    | h::t => Forall_cons'' val P h t (val_rect' h) (loop t)
+                    end
+                in
+                H6 l (loop l)
   end.
 
 Definition val_ind (P : val -> Prop) := @val_rect P.
@@ -653,13 +653,12 @@ Proof.
     right; intro con; inversion con; auto.
     right; intro con; inversion con; auto.
     right; intro con; inversion con; auto.
+  - generalize dependent l0. induction l; destruct l0; try (left; reflexivity); try (right; discriminate).
+    inversion X; subst; clear X. destruct (X0 v); destruct (IHl X1 l0); subst; try (right; discriminate); try (left; reflexivity).
+    right; injection; assumption.
+    right; injection; assumption.
+    right; injection. intro. assumption.
 Defined.
-(*   - generalize dependent l0. induction l; destruct l0; try (left; reflexivity); try (right; discriminate). *)
-(*     inversion X; subst; clear X. destruct (X0 v); destruct (IHl X1 l0); subst; try (right; discriminate); try (left; reflexivity). *)
-(*     right; injection; assumption. *)
-(*     right; injection; assumption. *)
-(*     right; injection. intro. assumption. *)
-(* Defined. *)
 
 Lemma UniqueCtorsInDef_dec : forall (td : (list tvarN * typeN * list (conN * list ast_t))),
     {UniqueCtorsInDef td} + {~ UniqueCtorsInDef td}.

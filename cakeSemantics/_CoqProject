@@ -1,5 +1,7 @@
 -R . CakeSem
 -R ../utils/ StructTact
+-I /home/barclata/projects/Coq-Equations/src
+-R /home/barclata/projects/Coq-Equations/theories Equations
 Word.v
 Utils.v
 ffi/FFI.v

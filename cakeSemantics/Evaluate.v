@@ -223,257 +223,257 @@ Definition do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list va
   match st with
     (s, t) =>
     match o, vs with
-    (* | ListAppend, [x1;x2] => *)
-    (*   match val_to_list x1, val_to_list x2 with *)
-    (*   | Some xs, Some ys => *)
-    (*     Some ((s,t), Rval (list_to_val (xs ++ ys))) *)
-    (*   | _, _ => None *)
-    (*   end *)
-    (* | Opn o', [Litv (IntLit n1); Litv (IntLit n2)] => *)
-    (*   if sumbool_and _ _ _ _ (Z.eq_dec n2 0) (sumbool_or _ _ _ _ (opn_eq_dec o' Divide) (opn_eq_dec o' Modulo)) *)
-    (*     then Some ((s,t), Rerr (Rraise div_exn_v)) *)
-    (*     else Some ((s,t), Rval (Litv (IntLit (opn_lookup o' n1 n2)))) *)
-    (* | Opb o', [Litv (IntLit n1); Litv (IntLit n2)] => *)
-    (*   Some ((s,t), Rval (Boolv (opb_lookup o' n1 n2))) *)
-    (* | Opw W8 o', [Litv (Word8Lit w1); Litv (Word8Lit w2)] => *)
-    (*   Some ((s,t), Rval (Litv (Word8Lit (opw8_lookup o' w1 w2)))) *)
-    (* | Opw W64 o', [Litv (Word64Lit w1); Litv (Word64Lit w2)] => *)
-    (*   Some ((s,t), Rval (Litv (Word64Lit (opw64_lookup o' w1 w2)))) *)
-    (* (* | FP_bop bop, [Litv (Word64Lit w1); Litv (Word64Lit w2)] => *) *)
-    (* (*     Some ((s,t),Rval (Litv (Word64Lit (fp_bop bop w1 w2)))) *) *)
-    (* (* | FP_uop uop, [Litv (Word64Lit w)] => *) *)
-    (* (*   Some ((s,t),Rval (Litv (Word64Lit (fp_uop uop w)))) *) *)
-    (* (* | FP_cmp cmp, [Litv (Word64Lit w1); Litv (Word64Lit w2)] => *) *)
-    (* (*   Some ((s,t),Rval (Boolv (fp_cmp cmp w1 w2))) *) *)
-    (* | Shift W8 o' n, [Litv (Word8Lit w)] => *)
-    (*   Some ((s,t), Rval (Litv (Word8Lit (shift8_lookup o' w n)))) *)
-    (* | Shift W64 o' n, [Litv (Word64Lit w)] => *)
-    (*   Some ((s,t), Rval (Litv (Word64Lit (shift64_lookup o' w n)))) *)
-    (* | Equality, [v1; v2] => *)
-    (*   match do_eq v1 v2 with *)
-    (*   | Eq_type_error => None *)
-    (*   | Eq_val b => Some ((s,t), Rval (Boolv b)) *)
-    (*   end *)
-    (* | Opassign, [Loc lnum; v] => *)
-    (*   match store_assign lnum (Refv v) s with *)
-    (*   | Some s' => Some ((s',t), Rval (Conv None [])) *)
-    (*   | None => None *)
-    (*   end *)
-    (* | Opref, [v] => *)
-    (*   let (s',n) := store_alloc (Refv v) s in *)
-    (*   Some ((s',t), Rval (Loc n)) *)
-    (* | Opderef, [Loc n] => *)
-    (*   match store_lookup n s with *)
-    (*   | Some (Refv v) => Some ((s,t), Rval v) *)
-    (*   | _ => None *)
-    (*   end *)
-    (* | Aw8alloc, [Litv (IntLit n); Litv (Word8Lit w)] => *)
-    (*   if (Z_lt_dec n 0)%Z then *)
-    (*     Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*   else *)
-    (*     let (s',lnum) := store_alloc (W8array (List.repeat w (Z.to_nat n))) s *)
-    (*     in Some ((s',t), Rval (Loc lnum)) *)
-    (* | Aw8sub, [Loc lnum; Litv (IntLit i)] => *)
-    (*   match store_lookup lnum s with *)
-    (*   | Some (W8array ws) => *)
-    (*     if (Z_lt_dec i 0)%Z *)
-    (*     then Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*     else *)
-    (*       let n := Z.to_nat i in *)
-    (*       match List.nth_error ws n with *)
-    (*       | None => Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*       | Some n' => Some ((s,t), Rval (Litv (Word8Lit n'))) *)
-    (*       end *)
-    (*   | _ => None *)
-    (*   end *)
-    (* | Aw8length, [Loc n] => *)
-    (*   match store_lookup n s with *)
-    (*   | Some (W8array ws) => Some ((s,t), Rval (Litv (IntLit (ZArith.Zcomplements.Zlength ws)))) *)
-    (*   | _ => None *)
-    (*   end *)
-    (* | Aw8update, [Loc lnum; Litv (IntLit i); Litv (Word8Lit w)] => *)
-    (*   match store_lookup lnum s with *)
-    (*   | Some (W8array ws) => *)
-    (*     if (Z_lt_dec i 0)%Z then *)
-    (*       Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*     else *)
-    (*       let n := Z.to_nat i in *)
-    (*       if Nat.leb (List.length ws) n then *)
-    (*         Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*       else *)
-    (*         match store_assign lnum (W8array (update n w ws)) s with *)
-    (*         | None => None *)
-    (*         | Some s' => Some ((s',t), Rval (Conv None [])) *)
-    (*         end *)
-    (*   | _ => None *)
-    (*   end *)
-    (* | WordFromInt W8, [Litv (IntLit i)] => *)
-    (*   Some ((s,t), Rval (Litv (Word8Lit (word8FromInteger i)))) *)
-    (* | WordFromInt W64, [Litv (IntLit i)] => *)
-    (*   Some ((s,t), Rval (Litv (Word64Lit (word64FromInteger i)))) *)
-    (* | WordToInt W8, [Litv (Word8Lit w)] => *)
-    (*   Some ((s,t), Rval (Litv (IntLit (Z.of_nat (word_to_nat _ w))))) *)
-    (* | WordToInt W64, [Litv (Word64Lit w)] => *)
-    (*   Some ((s,t), Rval (Litv (IntLit (Z.of_nat (word_to_nat _ w))))) *)
-    (* | CopyStrStr, [Litv (StrLit str); Litv (IntLit off); Litv (IntLit len)] => *)
-    (*   Some ((s,t), *)
-    (*         match copy_array (string_to_list_char str,off) len None with *)
-    (*         | None => Rerr (Rraise sub_exn_v) *)
-    (*         | Some cs => Rval (Litv (StrLit (list_char_to_string cs))) *)
-    (*         end) *)
-    (* | CopyStrAw8, [Litv (StrLit str); Litv (IntLit off); Litv (IntLit len); *)
-    (*                  Loc dst; Litv (IntLit dstoff)] => *)
-    (*   match store_lookup dst s with *)
-    (*   | Some (W8array ws) => *)
-    (*     match copy_array (string_to_list_char str, off) len *)
-    (*                      (Some (map word8_to_char ws, dstoff)) with *)
-    (*     | None => Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*     | Some cs => *)
-    (*       match store_assign dst (W8array (map char_to_word8 cs)) s with *)
-    (*       | Some s' =>  Some ((s',t), Rval (Conv None [])) *)
-    (*       | _ => None *)
-    (*       end *)
-    (*     end *)
-    (*   | _ => None *)
-    (*   end *)
-    (* | CopyAw8Str, [Loc src; Litv (IntLit off); Litv (IntLit len)] => *)
-    (*   match store_lookup src s with *)
-    (*   | Some (W8array ws) => *)
-    (*     Some ((s,t), *)
-    (*     match copy_array (ws,off) len None with *)
-    (*     | None => Rerr (Rraise sub_exn_v) *)
-    (*     | Some ws => Rval (Litv (StrLit( list_char_to_string *)
-    (*                                      (map word8_to_char ws)))) *)
-    (*     end) *)
-    (*   | _ => None *)
-    (*   end *)
-    (* | CopyAw8Aw8, [Loc src; Litv (IntLit off); Litv (IntLit len); *)
-    (*                  Loc dst; Litv (IntLit dstoff)] => *)
-    (*   match store_lookup src s, store_lookup dst s with *)
-    (*   | Some (W8array ws), Some (W8array ds) => *)
-    (*     match copy_array (ws,off) len (Some (ds,dstoff)) with *)
-    (*     | None => Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*     | Some ws => *)
-    (*       match store_assign dst (W8array ws) s with *)
-    (*       | Some s' => Some ((s',t), Rval (Conv None [])) *)
-    (*       | _ => None *)
-    (*       end *)
-    (*     end *)
-    (*   | _, _ => None *)
-    (*   end *)
-    (* | Ord, [Litv (CharLit c)] => *)
-    (*   Some ((s,t), Rval (Litv (IntLit (Z.of_nat (nat_of_ascii c))))) *)
-    (* | Chr, [Litv (IntLit i)] => *)
-    (*   Some ((s,t), if sumbool_and _ _ _ _ (Z_lt_dec i 0)%Z (Z_lt_dec 255 i)%Z *)
-    (*                then Rerr (Rraise chr_exn_v) *)
-    (*                else Rval (Litv (CharLit (ascii_of_nat (Z.to_nat i))))) *)
-    (* | Chopb op, [Litv (CharLit c1); Litv (CharLit c2)] => *)
-    (*   Some ((s,t), Rval (Boolv (opb_lookup op (Z.of_nat (nat_of_ascii c1)) *)
-    (*                                        (Z.of_nat (nat_of_ascii c2))))) *)
-    (* | Implode, [v] => *)
-    (*   match val_to_char_list v with *)
-    (*   | Some ls => Some ((s,t), Rval (Litv (StrLit (list_char_to_string ls)))) *)
-    (*   | None => None *)
-    (*   end *)
-    (* | Strsub, [Litv (StrLit str); Litv (IntLit i)] => *)
-    (*   if (Z_lt_dec i 0)%Z then *)
-    (*     Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*   else *)
-    (*     let n := Z.to_nat i in *)
-    (*     match String.get n str with *)
-    (*     | Some n' => Some ((s,t), Rval (Litv (CharLit n'))) *)
-    (*     | None    => Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*     end *)
-    (* | StrLen, [Litv (StrLit str)] => *)
-    (*   Some ((s,t), Rval (Litv (IntLit (Z.of_nat (String.length str))))) *)
-    (* | Strcat, [v] => *)
-    (*   match val_to_list v with *)
-    (*   | Some vs => *)
-    (*     match vals_to_string vs with *)
-    (*     | Some str => *)
-    (*       Some ((s,t), Rval (Litv(StrLit str))) *)
-    (*     | _ => None *)
-    (*     end *)
-    (*   | _ => None *)
-    (*   end *)
-    (* | VfromList, [v] => *)
-    (*   match val_to_list v with *)
-    (*   | Some vs => Some ((s,t), Rval (Vectorv vs)) *)
-    (*   | None    => None *)
-    (*   end *)
-    (* | VSub, [Vectorv vs; Litv (IntLit i)] => *)
-    (*   if (Z_lt_dec i 0)%Z *)
-    (*   then Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*   else *)
-    (*     let n := Z.to_nat i in *)
-    (*     match nth_error vs n with *)
-    (*     | None    => Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*     | Some v' => Some ((s,t), Rval v') *)
-    (*     end *)
-    (* | Vlength, [Vectorv vs] => *)
-    (*   Some ((s,t), Rval (Litv (IntLit (Z.of_nat (List.length  vs))))) *)
-    (* | Aalloc, [Litv (IntLit n); v] => *)
-    (*   if (Z_lt_dec n 0)%Z *)
-    (*   then Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*   else *)
-    (*     let (s',lnum) := store_alloc (Varray (List.repeat v (Z.to_nat n))) s *)
-    (*     in Some ((s',t), Rval (Loc lnum)) *)
-    (* | AallocEmpty, [Conv None []] => *)
-    (*   let (s',lnum) := store_alloc (Varray []) s *)
-    (*   in Some ((s',t), Rval (Loc lnum)) *)
-    (* | Asub, [Loc lnum; Litv (IntLit i)] => *)
-    (*   match store_lookup lnum s with *)
-    (*   | Some (Varray vs) => *)
-    (*     if (Z_lt_dec i 0)%Z then *)
-    (*       Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*     else *)
-    (*       let n := Z.to_nat i in *)
-    (*       match nth_error vs n with *)
-    (*       | None    => Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*       | Some v' => Some ((s,t), Rval v') *)
-    (*       end *)
-    (*   | _ => None *)
-    (*   end *)
-    (* | Alength, [Loc n] => *)
-    (*   match store_lookup n s with *)
-    (*   | Some (Varray ws) => *)
-    (*     Some ((s,t), Rval (Litv (IntLit (Z.of_nat (List.length ws))))) *)
-    (*   | _ => None *)
-    (*   end *)
-    (* | Aupdate, [Loc lnum; Litv (IntLit i); v] => *)
-    (*   match store_lookup lnum s with *)
-    (*   | Some (Varray vs') => *)
-    (*     if (Z_lt_dec i 0)%Z then (* LATER: use a wrapper function for this kind of test *) *)
-    (*       Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*     else *)
-    (*       let n := Z.to_nat i in *)
-    (*       if Nat.leb (List.length vs') n *)
-    (*       then Some ((s,t), Rerr (Rraise sub_exn_v)) *)
-    (*       else *)
-    (*         match store_assign lnum (Varray (update n v vs')) s with *)
-    (*         | None => None *)
-    (*         | Some s' => Some ((s',t), Rval (Conv None [])) *)
-    (*         end *)
-    (*   | _ => None *)
-    (*   end *)
-    (* | ConfigGC, [Litv (IntLit i); Litv (IntLit j)] => *)
-    (*   Some ((s,t), Rval (Conv None [])) *)
-    (* | FFI n, [Litv(StrLit conf); Loc lnum] => *)
-    (*   match store_lookup lnum s with *)
-    (*   | Some (W8array ws) => *)
-    (*     match call_FFI t n (List.map (fun c' => nat_to_word 8 (nat_of_ascii c')) *)
-    (*                                  (string_to_list_char conf)) ws with *)
-    (*     | Ffi_return _ t' ws' => *)
-    (*       match store_assign lnum (W8array ws') s with *)
-    (*       | Some s' => Some ((s', t'), Rval (Conv None [])) *)
-    (*       | None => None *)
-    (*       end *)
-    (*     | Ffi_final _ outcome => *)
-    (*       Some ((s, t), Rerr (Rabort (Rffi_error outcome))) *)
-    (*     end *)
-    (*   | _ => None *)
-    (*   end *)
-    | _, _ => None
+    | ListAppend, [x1;x2] =>
+      match val_to_list x1, val_to_list x2 with
+      | Some xs, Some ys =>
+        Some ((s,t), Rval (list_to_val (xs ++ ys)))
+      | _, _ => None
+      end
+    | Opn o', [Litv (IntLit n1); Litv (IntLit n2)] =>
+      if sumbool_and _ _ _ _ (Z.eq_dec n2 0) (sumbool_or _ _ _ _ (opn_eq_dec o' Divide) (opn_eq_dec o' Modulo))
+        then Some ((s,t), Rerr (Rraise div_exn_v))
+        else Some ((s,t), Rval (Litv (IntLit (opn_lookup o' n1 n2))))
+    | Opb o', [Litv (IntLit n1); Litv (IntLit n2)] =>
+      Some ((s,t), Rval (Boolv (opb_lookup o' n1 n2)))
+    | Opw W8 o', [Litv (Word8Lit w1); Litv (Word8Lit w2)] =>
+      Some ((s,t), Rval (Litv (Word8Lit (opw8_lookup o' w1 w2))))
+    | Opw W64 o', [Litv (Word64Lit w1); Litv (Word64Lit w2)] =>
+      Some ((s,t), Rval (Litv (Word64Lit (opw64_lookup o' w1 w2))))
+    (* | FP_bop bop, [Litv (Word64Lit w1); Litv (Word64Lit w2)] => *)
+    (*     Some ((s,t),Rval (Litv (Word64Lit (fp_bop bop w1 w2)))) *)
+    (* | FP_uop uop, [Litv (Word64Lit w)] => *)
+    (*   Some ((s,t),Rval (Litv (Word64Lit (fp_uop uop w)))) *)
+    (* | FP_cmp cmp, [Litv (Word64Lit w1); Litv (Word64Lit w2)] => *)
+    (*   Some ((s,t),Rval (Boolv (fp_cmp cmp w1 w2))) *)
+    | Shift W8 o' n, [Litv (Word8Lit w)] =>
+      Some ((s,t), Rval (Litv (Word8Lit (shift8_lookup o' w n))))
+    | Shift W64 o' n, [Litv (Word64Lit w)] =>
+      Some ((s,t), Rval (Litv (Word64Lit (shift64_lookup o' w n))))
+    | Equality, [v1; v2] =>
+      match do_eq v1 v2 with
+      | Eq_type_error => None
+      | Eq_val b => Some ((s,t), Rval (Boolv b))
+      end
+    | Opassign, [Loc lnum; v] =>
+      match store_assign lnum (Refv v) s with
+      | Some s' => Some ((s',t), Rval (Conv None []))
+      | None => None
+      end
+    | Opref, [v] =>
+      let (s',n) := store_alloc (Refv v) s in
+      Some ((s',t), Rval (Loc n))
+    | Opderef, [Loc n] =>
+      match store_lookup n s with
+      | Some (Refv v) => Some ((s,t), Rval v)
+      | _ => None
+      end
+    | Aw8alloc, [Litv (IntLit n); Litv (Word8Lit w)] =>
+      if (Z_lt_dec n 0)%Z then
+        Some ((s,t), Rerr (Rraise sub_exn_v))
+      else
+        let (s',lnum) := store_alloc (W8array (List.repeat w (Z.to_nat n))) s
+        in Some ((s',t), Rval (Loc lnum))
+    | Aw8sub, [Loc lnum; Litv (IntLit i)] =>
+      match store_lookup lnum s with
+      | Some (W8array ws) =>
+        if (Z_lt_dec i 0)%Z
+        then Some ((s,t), Rerr (Rraise sub_exn_v))
+        else
+          let n := Z.to_nat i in
+          match List.nth_error ws n with
+          | None => Some ((s,t), Rerr (Rraise sub_exn_v))
+          | Some n' => Some ((s,t), Rval (Litv (Word8Lit n')))
+          end
+      | _ => None
+      end
+    | Aw8length, [Loc n] =>
+      match store_lookup n s with
+      | Some (W8array ws) => Some ((s,t), Rval (Litv (IntLit (ZArith.Zcomplements.Zlength ws))))
+      | _ => None
+      end
+    | Aw8update, [Loc lnum; Litv (IntLit i); Litv (Word8Lit w)] =>
+      match store_lookup lnum s with
+      | Some (W8array ws) =>
+        if (Z_lt_dec i 0)%Z then
+          Some ((s,t), Rerr (Rraise sub_exn_v))
+        else
+          let n := Z.to_nat i in
+          if Nat.leb (List.length ws) n then
+            Some ((s,t), Rerr (Rraise sub_exn_v))
+          else
+            match store_assign lnum (W8array (update n w ws)) s with
+            | None => None
+            | Some s' => Some ((s',t), Rval (Conv None []))
+            end
+      | _ => None
+      end
+    | WordFromInt W8, [Litv (IntLit i)] =>
+      Some ((s,t), Rval (Litv (Word8Lit (word8FromInteger i))))
+    | WordFromInt W64, [Litv (IntLit i)] =>
+      Some ((s,t), Rval (Litv (Word64Lit (word64FromInteger i))))
+    | WordToInt W8, [Litv (Word8Lit w)] =>
+      Some ((s,t), Rval (Litv (IntLit (Z.of_nat (word_to_nat _ w)))))
+    | WordToInt W64, [Litv (Word64Lit w)] =>
+      Some ((s,t), Rval (Litv (IntLit (Z.of_nat (word_to_nat _ w)))))
+    | CopyStrStr, [Litv (StrLit str); Litv (IntLit off); Litv (IntLit len)] =>
+      Some ((s,t),
+            match copy_array (string_to_list_char str,off) len None with
+            | None => Rerr (Rraise sub_exn_v)
+            | Some cs => Rval (Litv (StrLit (list_char_to_string cs)))
+            end)
+    | CopyStrAw8, [Litv (StrLit str); Litv (IntLit off); Litv (IntLit len);
+                     Loc dst; Litv (IntLit dstoff)] =>
+      match store_lookup dst s with
+      | Some (W8array ws) =>
+        match copy_array (string_to_list_char str, off) len
+                         (Some (map word8_to_char ws, dstoff)) with
+        | None => Some ((s,t), Rerr (Rraise sub_exn_v))
+        | Some cs =>
+          match store_assign dst (W8array (map char_to_word8 cs)) s with
+          | Some s' =>  Some ((s',t), Rval (Conv None []))
+          | _ => None
+          end
+        end
+      | _ => None
+      end
+    | CopyAw8Str, [Loc src; Litv (IntLit off); Litv (IntLit len)] =>
+      match store_lookup src s with
+      | Some (W8array ws) =>
+        Some ((s,t),
+        match copy_array (ws,off) len None with
+        | None => Rerr (Rraise sub_exn_v)
+        | Some ws => Rval (Litv (StrLit( list_char_to_string
+                                         (map word8_to_char ws))))
+        end)
+      | _ => None
+      end
+    | CopyAw8Aw8, [Loc src; Litv (IntLit off); Litv (IntLit len);
+                     Loc dst; Litv (IntLit dstoff)] =>
+      match store_lookup src s, store_lookup dst s with
+      | Some (W8array ws), Some (W8array ds) =>
+        match copy_array (ws,off) len (Some (ds,dstoff)) with
+        | None => Some ((s,t), Rerr (Rraise sub_exn_v))
+        | Some ws =>
+          match store_assign dst (W8array ws) s with
+          | Some s' => Some ((s',t), Rval (Conv None []))
+          | _ => None
+          end
+        end
+      | _, _ => None
+      end
+    | Ord, [Litv (CharLit c)] =>
+      Some ((s,t), Rval (Litv (IntLit (Z.of_nat (nat_of_ascii c)))))
+    | Chr, [Litv (IntLit i)] =>
+      Some ((s,t), if sumbool_and _ _ _ _ (Z_lt_dec i 0)%Z (Z_lt_dec 255 i)%Z
+                   then Rerr (Rraise chr_exn_v)
+                   else Rval (Litv (CharLit (ascii_of_nat (Z.to_nat i)))))
+    | Chopb op, [Litv (CharLit c1); Litv (CharLit c2)] =>
+      Some ((s,t), Rval (Boolv (opb_lookup op (Z.of_nat (nat_of_ascii c1))
+                                           (Z.of_nat (nat_of_ascii c2)))))
+    | Implode, [v] =>
+      match val_to_char_list v with
+      | Some ls => Some ((s,t), Rval (Litv (StrLit (list_char_to_string ls))))
+      | None => None
+      end
+    | Strsub, [Litv (StrLit str); Litv (IntLit i)] =>
+      if (Z_lt_dec i 0)%Z then
+        Some ((s,t), Rerr (Rraise sub_exn_v))
+      else
+        let n := Z.to_nat i in
+        match String.get n str with
+        | Some n' => Some ((s,t), Rval (Litv (CharLit n')))
+        | None    => Some ((s,t), Rerr (Rraise sub_exn_v))
+        end
+    | StrLen, [Litv (StrLit str)] =>
+      Some ((s,t), Rval (Litv (IntLit (Z.of_nat (String.length str)))))
+    | Strcat, [v] =>
+      match val_to_list v with
+      | Some vs =>
+        match vals_to_string vs with
+        | Some str =>
+          Some ((s,t), Rval (Litv(StrLit str)))
+        | _ => None
+        end
+      | _ => None
+      end
+    | VfromList, [v] =>
+      match val_to_list v with
+      | Some vs => Some ((s,t), Rval (Vectorv vs))
+      | None    => None
+      end
+    | VSub, [Vectorv vs; Litv (IntLit i)] =>
+      if (Z_lt_dec i 0)%Z
+      then Some ((s,t), Rerr (Rraise sub_exn_v))
+      else
+        let n := Z.to_nat i in
+        match nth_error vs n with
+        | None    => Some ((s,t), Rerr (Rraise sub_exn_v))
+        | Some v' => Some ((s,t), Rval v')
+        end
+    | Vlength, [Vectorv vs] =>
+      Some ((s,t), Rval (Litv (IntLit (Z.of_nat (List.length  vs)))))
+    | Aalloc, [Litv (IntLit n); v] =>
+      if (Z_lt_dec n 0)%Z
+      then Some ((s,t), Rerr (Rraise sub_exn_v))
+      else
+        let (s',lnum) := store_alloc (Varray (List.repeat v (Z.to_nat n))) s
+        in Some ((s',t), Rval (Loc lnum))
+    | AallocEmpty, [Conv None []] =>
+      let (s',lnum) := store_alloc (Varray []) s
+      in Some ((s',t), Rval (Loc lnum))
+    | Asub, [Loc lnum; Litv (IntLit i)] =>
+      match store_lookup lnum s with
+      | Some (Varray vs) =>
+        if (Z_lt_dec i 0)%Z then
+          Some ((s,t), Rerr (Rraise sub_exn_v))
+        else
+          let n := Z.to_nat i in
+          match nth_error vs n with
+          | None    => Some ((s,t), Rerr (Rraise sub_exn_v))
+          | Some v' => Some ((s,t), Rval v')
+          end
+      | _ => None
+      end
+    | Alength, [Loc n] =>
+      match store_lookup n s with
+      | Some (Varray ws) =>
+        Some ((s,t), Rval (Litv (IntLit (Z.of_nat (List.length ws)))))
+      | _ => None
+      end
+    | Aupdate, [Loc lnum; Litv (IntLit i); v] =>
+      match store_lookup lnum s with
+      | Some (Varray vs') =>
+        if (Z_lt_dec i 0)%Z then (* LATER: use a wrapper function for this kind of test *)
+          Some ((s,t), Rerr (Rraise sub_exn_v))
+        else
+          let n := Z.to_nat i in
+          if Nat.leb (List.length vs') n
+          then Some ((s,t), Rerr (Rraise sub_exn_v))
+          else
+            match store_assign lnum (Varray (update n v vs')) s with
+            | None => None
+            | Some s' => Some ((s',t), Rval (Conv None []))
+            end
+      | _ => None
+      end
+    | ConfigGC, [Litv (IntLit i); Litv (IntLit j)] =>
+      Some ((s,t), Rval (Conv None []))
+    | FFI n, [Litv(StrLit conf); Loc lnum] =>
+      match store_lookup lnum s with
+      | Some (W8array ws) =>
+        match call_FFI t n (List.map (fun c' => nat_to_word 8 (nat_of_ascii c'))
+                                     (string_to_list_char conf)) ws with
+        | Ffi_return _ t' ws' =>
+          match store_assign lnum (W8array ws') s with
+          | Some s' => Some ((s', t'), Rval (Conv None []))
+          | None => None
+          end
+        | Ffi_final _ outcome =>
+          Some ((s, t), Rerr (Rabort (Rffi_error outcome)))
+        end
+      | _ => None
+      end
+    | _,_ => None
     end
   end.
 
@@ -708,7 +708,7 @@ Defined.
 (*----------------------------------------------------------------------------*)
 (*------------- EQUATIONS VERSION ------------------------------------------- *)
 (*----------------------------------------------------------------------------*)
-Require Import Equations.Equations.
+Require Import Equations.
 
 
 Instance FSRWellFounded : WellFounded fuel_size_rel.
@@ -1037,7 +1037,6 @@ Qed.
 Lemma eval_or_match_sing : forall (e : exp) (f : nat) (st st' : state nat) (env : sem_env val) (vs : list val),
     eval_or_match true [e] f st env uu uu = (st', Rval vs) -> exists (v : val), vs = [v].
 Proof.
-  (* I feel like this should be solvable inducting on e first and then inducting on  *)
   intros e f; revert e.
   induction f;
   induction e using exp_rect'; intros.
@@ -1124,6 +1123,7 @@ Proof.
      inv H.
      inv H.
 
+ (* EIf *)
  - simp eval_or_match in H.
    break_let.
    break_match.
@@ -1135,6 +1135,7 @@ Proof.
    inv H.
    inv H.
 
+(* EMat *)
  - simp eval_or_match in H.
    induction X.
    break_let.
@@ -1163,6 +1164,7 @@ Proof.
    inv H.
    inv H.
 
+(* ELet *)
  - simp eval_or_match in H.
    break_let.
    break_match.
@@ -1170,6 +1172,7 @@ Proof.
    apply IHe2 in H. assumption.
    inv H.
 
+(* ELetrec *)
  - simp eval_or_match in H.
    break_if.
    eapply IHe.
@@ -1240,31 +1243,36 @@ Proof.
    break_let.
    apply Forall''_rev in X.
    induction X.
-   simp eval_or_match in Heqp.
-   inv Heqp.
-   break_if.
-   simpl in H.
-   inv H.
-   simpl in *.
-   inv H.
-   destruct r.
-   break_if.
-   break_match.
-   break_let.
-   apply IHf in H.
-   apply H.
-   inv H.
-   break_match.
-   break_let.
-   break_let.
-   inv H.
-   destruct r.
-   simpl in *.
-   inv H2.
-   exists v. reflexivity.
-   inv H2.
-   inv H.
-   inv H.
+   * simp eval_or_match in Heqp.
+     inv Heqp.
+     break_if.
+     + simpl in H.
+       inv H.
+     + simpl in *.
+       inv H.
+       destruct o; inv H1.
+       destruct w; inv H1.
+       destruct w; inv H1.
+       destruct w; inv H1.
+       destruct w; inv H1.
+   * destruct r.
+     break_if.
+     break_match.
+     break_let.
+     apply IHf in H.
+     apply H.
+     inv H.
+     break_match.
+     break_let.
+     break_let.
+     inv H.
+     destruct r.
+     simpl in *.
+     inv H2.
+     exists v. reflexivity.
+     inv H2.
+     inv H.
+     inv H.
 
  - destruct lo; simp eval_or_match in H.
    + break_let.

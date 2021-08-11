@@ -48,7 +48,7 @@ Fixpoint list_char_to_string (ls : list char) : string :=
 Definition list_word8_to_string (ls : list word8) : string :=
   list_char_to_string (List.map word8_to_char ls).
 
-(** List update function *)
+(** List functions *)
 Fixpoint update {X : Type} (n : nat) (e : X) (l : list X) : list X :=
   match l with
   | [] => []
@@ -58,7 +58,6 @@ Fixpoint update {X : Type} (n : nat) (e : X) (l : list X) : list X :=
            end
   end.
 
-(** DecidableEquality Hint DB to be used by subsequent theories *)
 Create HintDb DecidableEquality.
 Hint Resolve string_dec : DecidableEquality.
 Hint Resolve Ascii.ascii_dec : DecidableEquality.

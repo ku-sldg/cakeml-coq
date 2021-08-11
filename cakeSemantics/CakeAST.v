@@ -3,7 +3,7 @@ Import ListNotations.
 Require Import BinNums.
 Require Import String.
 Require Import ZArith.BinInt.
-Require Import Equations.Equations.
+Require Import Equations.
 
 Require Import CakeSem.Utils.
 Require Import CakeSem.Namespace.
