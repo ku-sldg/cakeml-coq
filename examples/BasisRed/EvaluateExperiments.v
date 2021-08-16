@@ -39,6 +39,7 @@ Proof.
   intros.
   simp evaluate_decs.
   rewrite H.
+  simpl.
   rewrite H0.
   reflexivity.
 Qed.
@@ -115,11 +116,17 @@ Ltac evaluate_decs_noapp :=
     eapply evaluate_decs_cons'; [evaluate_decs_one | unfold extend_dec_env; simpl]
   end.
 
+Transparent evaluate_decs.
+Eval compute in evaluate_decs 100 init_state init_env prog.
+
 Theorem evaluate_30 : exists env st,
     evaluate_decs 100 st_0_26 env_28_29 [dec_def_30; dec_def_31] =
     (st, Rval env).
 Proof.
   econstructor; econstructor.
+
+  Transparent evaluate_decs.
+
 
   evaluate_decs_noapp.
   evaluate_decs_noapp.
