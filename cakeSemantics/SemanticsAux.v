@@ -12,8 +12,8 @@ Require ZArith.Zdigits.
 
 Require Import CakeSem.ffi.FFI.
 Require Import CakeSem.Utils.
-Require Import CakeSem.Namespace.
 Require Import CakeSem.CakeAST.
+Require Import CakeSem.Namespace.
 Require Import CakeSem.FreeVars.
 
 Open Scope string_scope.
@@ -31,12 +31,8 @@ Open Scope list_scope.
 Inductive stamp : Type :=
   | TypeStamp : conN -> nat -> stamp
   | ExnStamp : nat -> stamp.
-
-Theorem stamp_eq_dec : forall (s0 s1 : stamp), {s0 = s1} + {s0 <> s1}.
-Proof.
-  decide equality; auto with DecidableEquality.
-Defined.
-Hint Resolve stamp_eq_dec : DecidableEquality.
+Scheme Equality for stamp.
+#[export] Hint Resolve stamp_eq_dec : DecidableEquality.
 (* LATER : add type annotations? *)
 
 Definition bind_stamp := ExnStamp 0.
@@ -81,18 +77,18 @@ Definition extend_dec_env (V : Type) (new_env env : sem_env V) : sem_env V :=
   {| sev := nsAppend (sev new_env) (sev env);
      sec := nsAppend (sec new_env) (sec env)|}.
 
-Fixpoint optimize_sem_env {V : Type} (env : sem_env V) (fvs : list (ident modN varN)) : sem_env V :=
-  match fvs with
-    | [] => {| sec := nsEmpty; sev := nsEmpty |}
-    | id::fvs' => let opt := optimize_sem_env env fvs' in
-                match nsLookup (ident_eq_dec _ _ string_dec string_dec) id (sev env),
-                      nsLookup (ident_eq_dec _ _ string_dec string_dec) id (sec env) with
-                | Some v, Some v' => {| sec := (id, v')::(sec opt); sev := (id,v)::(sev opt) |}
-                | Some v, _       => {| sec := sec opt; sev := (id,v)::(sev opt) |}
-                | _, Some v'      => {| sec := (id, v')::(sec opt); sev := sev opt |}
-                | _, _ => opt
-                end
-  end.
+(* Fixpoint optimize_sem_env {V : Type} (env : sem_env V) (fvs : list (ident modN varN)) : sem_env V := *)
+(*   match fvs with *)
+(*     | [] => {| sec := nsEmpty; sev := nsEmpty |} *)
+(*     | id::fvs' => let opt := optimize_sem_env env fvs' in *)
+(*                 match nsLookup (ident_eq_dec _ _ string_dec string_dec) id (sev env), *)
+(*                       nsLookup (ident_eq_dec _ _ string_dec string_dec) id (sec env) with *)
+(*                 | Some v, Some v' => {| sec := (id, v')::(sec opt); sev := (id,v)::(sev opt) |} *)
+(*                 | Some v, _       => {| sec := sec opt; sev := (id,v)::(sev opt) |} *)
+(*                 | _, Some v'      => {| sec := (id, v')::(sec opt); sev := sev opt |} *)
+(*                 | _, _ => opt *)
+(*                 end *)
+(*   end. *)
 
 (* ---------------------------------------------------------------------- *)
 (** ** Values *)
@@ -282,20 +278,26 @@ Definition lit_same_type (l1 l2 : lit) : bool :=
     | _, _ => false
   end.
 
-Inductive stamp_same_type : stamp -> stamp -> Prop :=
-| TypeStampSame : forall n nm1 nm2, stamp_same_type (TypeStamp nm1 n) (TypeStamp nm2 n)
-| ExnStampSame : forall n m, stamp_same_type (ExnStamp n) (ExnStamp m).
+Definition stamp_same_type (s1 s2 : stamp) : bool :=
+  match s1, s2 with
+  | TypeStamp _ n1, TypeStamp _ n2 => Nat.eqb n1 n2
+  | ExnStamp _, ExnStamp _ => true
+  | _, _ => false
+  end.
+(* Inductive stamp_same_type : stamp -> stamp -> Prop := *)
+(* | TypeStampSame : forall n nm1 nm2, stamp_same_type (TypeStamp nm1 n) (TypeStamp nm2 n) *)
+(* | ExnStampSame : forall n m, stamp_same_type (ExnStamp n) (ExnStamp m). *)
 
-Theorem stamp_same_type_dec : forall s1 s2, {stamp_same_type s1 s2} + {not (stamp_same_type s1 s2)}.
-Proof.
-  induction s1; destruct s2.
-  - destruct (Nat.eq_dec n n0); subst.
-    + left. constructor.
-    + right. intros contra. inv contra. congruence.
-  - right. intros contra. inv contra.
-  - right. intros contra. inv contra.
-  - left. constructor.
-Defined.
+(* Theorem stamp_same_type_dec : forall s1 s2, {stamp_same_type s1 s2} + {not (stamp_same_type s1 s2)}. *)
+(* Proof. *)
+(*   induction s1; destruct s2. *)
+(*   - destruct (Nat.eq_dec n n0); subst. *)
+(*     + left. constructor. *)
+(*     + right. intros contra. inv contra. congruence. *)
+(*   - right. intros contra. inv contra. *)
+(*   - right. intros contra. inv contra. *)
+(*   - left. constructor. *)
+(* Defined. *)
 
 (* Definition stamp_same_type (s1 s2 : stamp) : bool := *)
 (*   match s1, s2 with *)
@@ -304,25 +306,32 @@ Defined.
 (*   | _, _ => false *)
 (*   end. *)
 
-Inductive ctor_same_type : option stamp -> option stamp -> Prop :=
-| CtorNoneSame : ctor_same_type None None
-| CtorSomeSame : forall s1 s2, stamp_same_type s1 s2 ->
-                          ctor_same_type (Some s1) (Some s2).
+Definition ctor_same_type (os1 os2 : option stamp) : bool :=
+  match os1, os2 with
+  | None, None => true
+  | Some s1, Some s2 => stamp_same_type s1 s2
+  | _, _ => false
+end.
 
-Theorem ctor_same_type_dec : forall o1 o2, {ctor_same_type o1 o2} + {not (ctor_same_type o1 o2)}.
-Proof.
-  intros. destruct o1; destruct o2; try (destruct s; destruct s0).
-  - destruct (Nat.eq_dec n n0).
-    + subst. left. constructor. constructor.
-    + subst. right. intro contra. inv contra.
-      inv H1. congruence.
-  - right. intro contra. inv contra. inv H1.
-  - right. intro contra. inv contra. inv H1.
-  - left. constructor. constructor.
-  - right. intro contra. inv contra.
-  - right. intro contra. inv contra.
-  - left. constructor.
-Defined.
+(* Inductive ctor_same_type : option stamp -> option stamp -> Prop := *)
+(* | CtorNoneSame : ctor_same_type None None *)
+(* | CtorSomeSame : forall s1 s2, stamp_same_type s1 s2 -> *)
+(*                           ctor_same_type (Some s1) (Some s2). *)
+
+(* Theorem ctor_same_type_dec : forall o1 o2, {ctor_same_type o1 o2} + {not (ctor_same_type o1 o2)}. *)
+(* Proof. *)
+(*   intros. destruct o1; destruct o2; try (destruct s; destruct s0). *)
+(*   - destruct (Nat.eq_dec n n0). *)
+(*     + subst. left. constructor. constructor. *)
+(*     + subst. right. intro contra. inv contra. *)
+(*       inv H1. congruence. *)
+(*   - right. intro contra. inv contra. inv H1. *)
+(*   - right. intro contra. inv contra. inv H1. *)
+(*   - left. constructor. constructor. *)
+(*   - right. intro contra. inv contra. *)
+(*   - right. intro contra. inv contra. *)
+(*   - left. constructor. *)
+(* Defined. *)
 
 (* Definition ctor_same_type (c1 c2 : option stamp) : bool := *)
 (*   match c1, c2 with *)
@@ -334,13 +343,14 @@ Defined.
 (** [con_check cenv o l] asserts that the constructor (or None for a tuple) admits arity [l].
     (Note that tuples admit any arity.)
     This is an inductive version of [do_con_check] *)
-
-Inductive con_check (cenv : env_ctor) : constr_id -> nat -> Prop :=
-  | con_check_none : forall l,
-      con_check cenv None l
-  | con_check_some : forall n l s,
-      nsLookup (ident_eq_dec _ _ string_dec string_dec) n cenv = Some (l,s) ->
-      con_check cenv (Some n) l.
+Definition con_check (cenv : env_ctor) (cid : constr_id) (l : nat) : bool :=
+  match cid with
+  | None => true
+  | Some id => match nsLookup (ident_beq _ _ String.eqb String.eqb) id cenv with
+              | None => false
+              | Some (l',s) => Nat.eqb l' l
+              end
+  end.
 
 (* ---------------------------------------------------------------------- *)
 (** ** Operations on the store *)
@@ -360,22 +370,20 @@ Definition store_assign_nocheck {A : Type} (n : nat) (v : store_v A) (st : store
 (* ---------------------------------------------------------------------- *)
 (** ** Operations on constructors *)
 
-(** [con_build cenv n s] relates a constructor name [n] with its stamp [s]
-    This is an inductive version of [build_conv]. *)
-
-Inductive con_build (cenv : env_ctor) : constr_id -> option stamp -> Prop :=
-  | con_build_none :
-      con_build cenv None None
-  | con_build_some : forall n l s,
-      nsLookup (ident_eq_dec _ _ string_dec string_dec) n cenv = Some (l,s) ->
-      con_build cenv (Some n) (Some s).
+Fixpoint build_conv (cenv : env_ctor) (cid : constr_id) (vs: list val) : option val :=
+  match cid with
+  | None => Some (Conv None vs)
+  | Some id => match nsLookup (ident_beq _ _ String.eqb String.eqb) id cenv with
+              | None => None
+              | Some (len,stmp) => Some (Conv (Some stmp) vs)
+              end
+  end.
 
 (* ---------------------------------------------------------------------- *)
 (** ** Operations for functions *)
-(* test thing: cl_env -> (optimize_sem_env cl_env (free_vars e)) *)
 Definition build_rec_env (funs : list (varN * varN * exp)) (cl_env : sem_env val)
            (add_to_env : env_val) : env_val :=
-  fold_right (fun '(f,x,e) env' => nsBind f (Recclosure (optimize_sem_env cl_env (free_vars e)) funs f) env') add_to_env funs.
+  fold_right (fun '(f,x,e) env' => nsBind f (Recclosure cl_env funs f) env') add_to_env funs.
 
 Fixpoint find_recfun {A B : Type} (n : varN) (funs : list (varN * A * B)) : option (A * B) :=
   match funs with
@@ -601,64 +609,76 @@ Fixpoint val_rect (P : val -> Type)
 Definition val_ind (P : val -> Prop) := @val_rect P.
 Definition val_rec (P : val -> Set) := @val_rect P.
 
+Fixpoint val_beq (v1 v2 : val) : bool :=
+  match v1, v2 with
+  | Litv l1, Litv l2 => lit_beq l1 l2
+  | Conv o1 l1, Conv o2 l2 => andb (option_beq _ stamp_beq o1 o2) (list_beq val_beq l1 l2)
+  (* not real equality, but considered equivalent by CakeML*)
+  | Closure env1 v1 e1, Closure env2 v2 e2 => true
+  | Recclosure env1 l1 v1, Recclosure env2 l2 v2 => true
+  | Loc n1, Loc n2 => n1 =? n2
+  | Vectorv l1, Vectorv l2 => list_beq val_beq l1 l2
+  | _, _ => false
+  end.
+
 (** Decidability theorems *)
 
-Theorem val_eq_dec : forall (v0 v1 : val), {v0 = v1} + {v0 <> v1}.
-Proof.
-  decide equality; auto with DecidableEquality.
-  - generalize dependent l0. induction l; destruct l0; try (left; reflexivity); try (right; discriminate).
-    inversion X; subst; clear X. destruct (X0 v); destruct (IHl X1 l0); subst; try (right; discriminate); try (left; reflexivity).
-    right; injection; assumption.
-    right; injection; assumption.
-    right; injection. intro. assumption.
-  - generalize dependent s0. induction s; destruct s0.
+(* Theorem val_eq_dec : forall (v0 v1 : val), {v0 = v1} + {v0 <> v1}. *)
+(* Proof. *)
+(*   decide equality; auto with DecidableEquality. *)
+(*   - generalize dependent l0. induction l; destruct l0; try (left; reflexivity); try (right; discriminate). *)
+(*     inversion X; subst; clear X. destruct (X0 v); destruct (IHl X1 l0); subst; try (right; discriminate); try (left; reflexivity). *)
+(*     right; injection; assumption. *)
+(*     right; injection; assumption. *)
+(*     right; injection. intro. assumption. *)
+(*   - generalize dependent s0. induction s; destruct s0. *)
 
-    assert (pair_nat_stamp_dec : forall (p p0: (nat * stamp)), {p = p0} + {p <> p0})
-      by (decide equality; auto with DecidableEquality).
-    destruct (namespace_eq_dec modN conN (nat * stamp) String.string_dec String.string_dec
-                               pair_nat_stamp_dec sec0 sec1); subst.
+(*     assert (pair_nat_stamp_dec : forall (p p0: (nat * stamp)), {p = p0} + {p <> p0}) *)
+(*       by (decide equality; auto with DecidableEquality). *)
+(*     destruct (namespace_eq_dec modN conN (nat * stamp) String.string_dec String.string_dec *)
+(*                                pair_nat_stamp_dec sec0 sec1); subst. *)
 
-    generalize dependent sev1.
-    simpl in X.
-    induction X; destruct sev1; try (left; reflexivity); try (right; discriminate).
-    destruct x; destruct p0.
-    destruct (ident_eq_dec modN varN string_dec string_dec i i0); subst.
-    destruct (p v3); subst.
-    simpl in *.
-    destruct (IHX sev1).
-    inversion e1.
-    left; reflexivity.
-    right; intro con; inversion con. apply n0. rewrite H0. reflexivity.
-    right; intro con; inversion con; auto.
-    right; intro con; inversion con; auto.
-    right; intro con; inversion con; auto.
-  - generalize dependent s0. induction s; destruct s0.
+(*     generalize dependent sev1. *)
+(*     simpl in X. *)
+(*     induction X; destruct sev1; try (left; reflexivity); try (right; discriminate). *)
+(*     destruct x; destruct p0. *)
+(*     destruct (ident_eq_dec modN varN string_dec string_dec i i0); subst. *)
+(*     destruct (p v3); subst. *)
+(*     simpl in *. *)
+(*     destruct (IHX sev1). *)
+(*     inversion e1. *)
+(*     left; reflexivity. *)
+(*     right; intro con; inversion con. apply n0. rewrite H0. reflexivity. *)
+(*     right; intro con; inversion con; auto. *)
+(*     right; intro con; inversion con; auto. *)
+(*     right; intro con; inversion con; auto. *)
+(*   - generalize dependent s0. induction s; destruct s0. *)
 
-    assert (pair_nat_stamp_dec : forall (p p0: (nat * stamp)), {p = p0} + {p <> p0})
-      by (decide equality; auto with DecidableEquality).
-    destruct (namespace_eq_dec modN conN (nat * stamp) String.string_dec String.string_dec
-                               pair_nat_stamp_dec sec0 sec1); subst.
+(*     assert (pair_nat_stamp_dec : forall (p p0: (nat * stamp)), {p = p0} + {p <> p0}) *)
+(*       by (decide equality; auto with DecidableEquality). *)
+(*     destruct (namespace_eq_dec modN conN (nat * stamp) String.string_dec String.string_dec *)
+(*                                pair_nat_stamp_dec sec0 sec1); subst. *)
 
-    simpl in X.
-    generalize dependent sev1.
-    induction X; destruct sev1; try (left; reflexivity); try (right; discriminate).
-    destruct x; destruct p0.
-    destruct (ident_eq_dec modN varN string_dec string_dec i i0); subst.
-    destruct (p v3); subst.
-    simpl in *.
-    destruct (IHX sev1).
-    inversion e.
-    left; reflexivity.
-    right; intro con; inversion con. apply n0. rewrite H0. reflexivity.
-    right; intro con; inversion con; auto.
-    right; intro con; inversion con; auto.
-    right; intro con; inversion con; auto.
-  - generalize dependent l0. induction l; destruct l0; try (left; reflexivity); try (right; discriminate).
-    inversion X; subst; clear X. destruct (X0 v); destruct (IHl X1 l0); subst; try (right; discriminate); try (left; reflexivity).
-    right; injection; assumption.
-    right; injection; assumption.
-    right; injection. intro. assumption.
-Defined.
+(*     simpl in X. *)
+(*     generalize dependent sev1. *)
+(*     induction X; destruct sev1; try (left; reflexivity); try (right; discriminate). *)
+(*     destruct x; destruct p0. *)
+(*     destruct (ident_eq_dec modN varN string_dec string_dec i i0); subst. *)
+(*     destruct (p v3); subst. *)
+(*     simpl in *. *)
+(*     destruct (IHX sev1). *)
+(*     inversion e. *)
+(*     left; reflexivity. *)
+(*     right; intro con; inversion con. apply n0. rewrite H0. reflexivity. *)
+(*     right; intro con; inversion con; auto. *)
+(*     right; intro con; inversion con; auto. *)
+(*     right; intro con; inversion con; auto. *)
+(*   - generalize dependent l0. induction l; destruct l0; try (left; reflexivity); try (right; discriminate). *)
+(*     inversion X; subst; clear X. destruct (X0 v); destruct (IHl X1 l0); subst; try (right; discriminate); try (left; reflexivity). *)
+(*     right; injection; assumption. *)
+(*     right; injection; assumption. *)
+(*     right; injection. intro. assumption. *)
+(* Defined. *)
 
 Lemma UniqueCtorsInDef_dec : forall (td : (list tvarN * typeN * list (conN * list ast_t))),
     {UniqueCtorsInDef td} + {~ UniqueCtorsInDef td}.

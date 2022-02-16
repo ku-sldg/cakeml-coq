@@ -44,34 +44,43 @@ Definition namespace (M N V : Type) := alist (ident M N) V.
 Definition nsEmpty {M N V : Type} :=
   @nil ((ident M N) * V).
 
-(* Namespace functions using a sumbool type for equality tests *)
-Fixpoint lookup {X Y : Type} (f : forall (x1 x2 : X), {x1 = x2} + {x1 <> x2}) (x : X) (l : alist X Y) : option Y :=
+Fixpoint lookup {X Y : Type} (f : X -> X -> bool) (x : X) (l : alist X Y) : option Y :=
   match l with
   | [] => None
   | (x',y) :: l' => if f x x' then Some y else lookup f x l'
   end.
 
-Fixpoint get_modded_namespace {M N V : Type} (f : forall (x1 x2 : M), {x1 = x2} + {x1 <> x2})
+(* Namespace functions using a sumbool type for equality tests *)
+Fixpoint lookup_dec {X Y : Type} (f : forall (x1 x2 : X), {x1 = x2} + {x1 <> x2}) (x : X) (l : alist X Y) : option Y :=
+  match l with
+  | [] => None
+  | (x',y) :: l' => if f x x' then Some y else lookup_dec f x l'
+  end.
+
+Fixpoint get_modded_namespace_dec {M N V : Type} (f : forall (x1 x2 : M), {x1 = x2} + {x1 <> x2})
          (m : M) (ns : namespace M N V) : namespace M N V :=
   match ns with
   | [] => []
   | (i,v) :: ns' => match i with
-                    | Short _ => get_modded_namespace f m ns'
+                    | Short _ => get_modded_namespace_dec f m ns'
                     | Long m' i' => if f m m'
-                                   then (i',v) :: (get_modded_namespace f m ns')
-                                   else get_modded_namespace f m ns'
+                                   then (i',v) :: (get_modded_namespace_dec f m ns')
+                                   else get_modded_namespace_dec f m ns'
                   end
   end.
 
-Definition nsLookup {M N V : Type} (f : forall (x1 x2 : ident M N), {x1 = x2} + {x1 <> x2})
+Definition nsLookup {M N V : Type} (f : ident M N -> ident M N -> bool)
            (id : ident M N) (ns : namespace M N V) : option V := lookup f id ns.
 
-Fixpoint nsLookupMod {M N V : Type} (f_dec : forall m1 m2 : M, {m1 = m2} + {m1 <> m2})
+Definition nsLookup_dec {M N V : Type} (f : forall (x1 x2 : ident M N), {x1 = x2} + {x1 <> x2})
+           (id : ident M N) (ns : namespace M N V) : option V := lookup_dec f id ns.
+
+Fixpoint nsLookupMod_dec {M N V : Type} (f_dec : forall m1 m2 : M, {m1 = m2} + {m1 <> m2})
          (ns : namespace M N V) (xs : list M): option (namespace M N V) :=
   match xs, ns with
   | _, [] => None
   | [], ns => Some ns
-  | m :: ms, ns => nsLookupMod f_dec
+  | m :: ms, ns => nsLookupMod_dec f_dec
                              (filter (fun '(i1,i2) => match i1 with
                                                    | Short n    => false
                                                    | Long  m' n => if f_dec m m' then true else false
@@ -104,22 +113,20 @@ Definition nsOptBind {M N V : Type} (n : option N) (v : V) (ns : namespace M N V
 Definition nsSing {M N V : Type} (n : N) (v : V) : namespace M N V :=
   [(Short n, v)].
 
-(* LATER: fix this difference *)
-(* First difference here. Using Prop instead of bool. *)
 Definition nsSub {M N V1 V2 : Type}
            (dec : forall (x y : ident M N), {x=y} + {x<>y})
            (rel : ident M N -> V1 -> V2 -> Prop)
            (ns1 : namespace M N V1)
            (ns2 : namespace M N V2) : Prop :=
-     (forall (id : ident M N) (v1 : V1), nsLookup dec id ns1 = Some v1 ->
-       exists (v2 : V2), nsLookup dec id ns2 = Some v2 /\ rel id v1 v2)
-  /\ (forall (id : ident M N), nsLookup dec id ns1 = None -> nsLookup dec id ns2 = None).
+     (forall (id : ident M N) (v1 : V1), nsLookup_dec dec id ns1 = Some v1 ->
+       exists (v2 : V2), nsLookup_dec dec id ns2 = Some v2 /\ rel id v1 v2)
+  /\ (forall (id : ident M N), nsLookup_dec dec id ns1 = None -> nsLookup_dec dec id ns2 = None).
 
 Definition nsAll {M N V : Type} (dec : forall (x y : ident M N), {x=y} + {x<>y})
            (rel : ident M N -> V -> Prop)
            (ns : namespace M N V) : Prop :=
   (forall (id : ident M N) (v : V),
-     nsLookup dec id ns = Some v -> rel id v).
+     nsLookup_dec dec id ns = Some v -> rel id v).
 
 (* Definition eAll2 {M N V1 V2 : Type} (rel : ident M N -> V1 -> V2 -> Prop) *)
 (*   (ns1 : namespace M N V1) (ns2 : namespace M N V2) : Prop := *)
@@ -147,7 +154,7 @@ Fixpoint extractMods {M N V : Type} (ns : namespace M N V) : list (list M) :=
   | (id,_)::ns' => get_ids id :: extractMods ns'
   end.
 
-Fixpoint nsMap {M N V W : Type} (f : V -> W)
+Definition nsMap {M N V W : Type} (f : V -> W)
          (ns : namespace M N V) : namespace M N W :=
   map (fun '(i1,i2) => (i1, f i2)) ns.
 
@@ -167,8 +174,8 @@ Section NamespaceDec.
   Theorem namespace_eq_dec : forall (n0 n1 : namespace M N V), {n0 = n1} + {n0 <> n1}.
   Proof. decide equality. decide equality. apply ident_eq_dec. Defined.
 End NamespaceDec.
-Hint Resolve namespace_eq_dec : DecidableEquality.
-Hint Resolve ident_eq_dec : DecidableEquality.
+#[export] Hint Resolve namespace_eq_dec : DecidableEquality.
+#[export] Hint Resolve ident_eq_dec : DecidableEquality.
 
 Section LookupTheory.
   Variable N : Type.
@@ -176,8 +183,8 @@ Section LookupTheory.
   Variable n_dec : forall (n0 n1 : N), {n0 = n1} + {n0 <> n1}.
 
   Lemma lookup_cover : forall (n : N) (ns ns' : alist N V) (v : V),
-      lookup n_dec n ns  = Some v ->
-      lookup n_dec n (ns ++ ns') = lookup n_dec n ns.
+      lookup_dec n_dec n ns  = Some v ->
+      lookup_dec n_dec n (ns ++ ns') = lookup_dec n_dec n ns.
   Proof.
     intros n ns ns' v.
     generalize dependent ns'.
@@ -189,8 +196,8 @@ Section LookupTheory.
   Qed.
 
   Lemma lookup_drop : forall (id : N) (ns ns' : alist N V),
-      lookup n_dec id ns = None ->
-      lookup n_dec id (ns ++ ns') = lookup n_dec id ns'.
+      lookup_dec n_dec id ns = None ->
+      lookup_dec n_dec id (ns ++ ns') = lookup_dec n_dec id ns'.
   Proof.
     intros id ns.
     induction ns; intros ns' H.
@@ -201,10 +208,10 @@ Section LookupTheory.
   Qed.
 
   Lemma lookup_same : forall (n : N) (ns : alist N V),
-      lookup n_dec n (ns ++ ns) = lookup n_dec n ns.
+      lookup_dec n_dec n (ns ++ ns) = lookup_dec n_dec n ns.
   Proof.
     intros n ns.
-    destruct (lookup n_dec n ns) eqn:H; rewrite <- H.
+    destruct (lookup_dec n_dec n ns) eqn:H; rewrite <- H.
     - apply lookup_cover with v; assumption.
     - apply lookup_drop; assumption.
   Qed.
@@ -221,7 +228,7 @@ Section NamespaceTheory.
   Definition id_dec := ident_eq_dec M N m_dec n_dec.
 
   Lemma get_modded_namespace_append : forall (ns ns' : namespace M N V) (x : M),
-      get_modded_namespace m_dec x (ns ++ ns') = (get_modded_namespace m_dec x ns) ++ (get_modded_namespace m_dec x ns').
+      get_modded_namespace_dec m_dec x (ns ++ ns') = (get_modded_namespace_dec m_dec x ns) ++ (get_modded_namespace_dec m_dec x ns').
   Proof.
     induction ns; intros ns' x.
     - reflexivity.
@@ -233,25 +240,25 @@ Section NamespaceTheory.
   Qed.
 
   Lemma nsLookup_cover : forall (id : ident M N) (ns ns' : namespace M N V) (v : V),
-      nsLookup id_dec id ns = Some v ->
-      nsLookup id_dec id (ns ++ ns') = nsLookup id_dec id ns.
+      nsLookup_dec id_dec id ns = Some v ->
+      nsLookup_dec id_dec id (ns ++ ns') = nsLookup_dec id_dec id ns.
   Proof.
-    intros. unfold nsLookup in *. apply lookup_cover with v. assumption.
+    intros. unfold nsLookup_dec in *. apply lookup_cover with v. assumption.
   Qed.
 
   Lemma nsLookup_drop : forall (id : ident M N) (ns ns' : namespace M N V),
-      nsLookup id_dec id ns = None ->
-      nsLookup id_dec id (ns ++ ns') = nsLookup id_dec id ns'.
+      nsLookup_dec id_dec id ns = None ->
+      nsLookup_dec id_dec id (ns ++ ns') = nsLookup_dec id_dec id ns'.
   Proof.
     intros id ns ns' H.
-    unfold nsLookup in *. apply lookup_drop. assumption.
+    unfold nsLookup_dec in *. apply lookup_drop. assumption.
   Qed.
 
   Lemma nsLookup_same : forall (id : ident M N) (ns : namespace M N V),
-      nsLookup id_dec id (ns ++ ns) = nsLookup id_dec id ns.
+      nsLookup_dec id_dec id (ns ++ ns) = nsLookup_dec id_dec id ns.
   Proof.
     intros id ns.
-    unfold nsLookup in *. apply lookup_same.
+    unfold nsLookup_dec in *. apply lookup_same.
   Qed.
 
 End NamespaceTheory.

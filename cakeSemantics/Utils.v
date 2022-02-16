@@ -59,13 +59,12 @@ Fixpoint update {X : Type} (n : nat) (e : X) (l : list X) : list X :=
   end.
 
 Create HintDb DecidableEquality.
-Hint Resolve string_dec : DecidableEquality.
-Hint Resolve Ascii.ascii_dec : DecidableEquality.
-Hint Resolve (word_eq_dec 8) : DecidableEquality.
-Hint Resolve (word_eq_dec 64) : DecidableEquality.
-Hint Resolve Z.eq_dec : DecidableEquality.
-Hint Resolve list_eq_dec : DecidableEquality.
-Hint Resolve Peano_dec.eq_nat_dec : DecidableEquality.
+#[export] Hint Resolve string_dec : DecidableEquality.
+#[export] Hint Resolve Ascii.ascii_dec : DecidableEquality.
+#[export] Hint Resolve word_eq_dec : DecidableEquality.
+#[export] Hint Resolve Z.eq_dec : DecidableEquality.
+#[export] Hint Resolve list_eq_dec : DecidableEquality.
+#[export] Hint Resolve Peano_dec.eq_nat_dec : DecidableEquality.
 
 Ltac inv H := inversion H; subst; clear H.
 
@@ -74,7 +73,7 @@ Theorem option_eq_dec : forall (X : Type), (forall (x y : X), {x = y} + {x <> y}
 Proof.
   decide equality.
 Defined.
-Hint Resolve option_eq_dec : DecidableEquality.
+#[export] Hint Resolve option_eq_dec : DecidableEquality.
 
 Theorem pair_eq_dec : forall (X Y: Type),
     (forall (x0 y0 : X), {x0 = y0} + {x0 <> y0}) ->
@@ -83,7 +82,7 @@ Theorem pair_eq_dec : forall (X Y: Type),
 Proof.
   decide equality.
 Defined.
-Hint Resolve pair_eq_dec : DecidableEquality.
+#[export] Hint Resolve pair_eq_dec : DecidableEquality.
 
 Theorem NoDuplicates_dec {A : Type} :
     (forall (x y : A), {x = y} + {x <> y}) -> forall (l : list A), {NoDup l} + {~ NoDup l}.

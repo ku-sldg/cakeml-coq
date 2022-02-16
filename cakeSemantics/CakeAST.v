@@ -3,18 +3,18 @@ Import ListNotations.
 Require Import BinNums.
 Require Import String.
 Require Import ZArith.BinInt.
-Require Import Equations.
+From Equations Require Import Equations.
 
 Require Import CakeSem.Utils.
 Require Import CakeSem.Namespace.
 
 (* Literal constants *)
 Inductive lit : Type :=
-  | IntLit : int -> lit
-  | CharLit : char -> lit
-  | StrLit : string -> lit
-  | Word8Lit : word8 -> lit
-  | Word64Lit : word64 -> lit.
+| IntLit : int -> lit
+| CharLit : char -> lit
+| StrLit : string -> lit
+| Word8Lit : word8 -> lit
+| Word64Lit : word64 -> lit.
 
 Inductive opn : Type :=
   | Plus : opn
@@ -22,12 +22,14 @@ Inductive opn : Type :=
   | Times : opn
   | Divide : opn
   | Modulo : opn.
+Scheme Equality for opn.
 
 Inductive opb : Type :=
   | Lt : opb
   | Gt : opb
   | Leq : opb
   | Geq : opb.
+Scheme Equality for opb.
 
 Inductive opw : Type :=
   | Andw : opw
@@ -35,12 +37,14 @@ Inductive opw : Type :=
   | Xorw : opw
   | Addw : opw
   | Subw : opw.
+Scheme Equality for opw.
 
 Inductive shift : Type :=
   | Lsl : shift
   | Lsr : shift
   | Asr : shift
   | Ror : shift.
+Scheme Equality for shift.
 
 Definition modN := string.
 
@@ -55,19 +59,24 @@ Definition tvarN := string.
 Inductive word_size : Type :=
   | W8 : word_size
   | W64 : word_size.
+Scheme Equality for word_size.
 
 
 Inductive fpcmp : Type :=
 | FP_Less | FP_LessEqual | FP_Greater | FP_GreaterEqual | FP_Equal.
+Scheme Equality for fpcmp.
 
 Inductive fpuop : Type :=
 | FP_Abs | FP_Neg | FP_Sqrt.
+Scheme Equality for fpuop.
 
 Inductive fpbop : Type :=
 | FP_Add | FP_Sub | FP_Mul | FP_Div.
+Scheme Equality for fpbop.
 
-Inductive fptop : Type :=
-|  FP_Fma.
+Inductive fptop : Set :=
+| FP_Fma.
+Scheme Equality for fptop.
 
 Inductive op : Type :=
   | Opn : opn -> op
@@ -129,10 +138,12 @@ Inductive op : Type :=
   | ConfigGC : op
   (* Call a given foreign function *)
   | FFI : string -> op.
+Scheme Equality for op.
 
 Inductive lop : Type :=
   | And : lop
   | Or : lop.
+Scheme Equality for lop.
 
 (* Helper relation for lists *)
 Inductive Forall'' (A : Type) (P'' : A -> Type) : list A -> Type :=
@@ -183,8 +194,6 @@ Inductive exp : Type :=
   | ELannot : exp -> locs -> exp.
 Derive NoConfusion for exp.
 
-Unset Elimination Schemes.
-
 Definition typeDef : Type :=
   list (list tvarN * typeN * list (conN * list ast_t)).
 
@@ -197,6 +206,7 @@ Inductive dec : Type :=
   | Dexn : locs -> conN -> list ast_t -> dec
   | Dmod : modN -> list dec -> dec
   | Dlocal : list dec -> list dec -> dec.
+Derive NoConfusion for dec.
 
 Fixpoint pat_bindings (p : pat) : list varN :=
   match p with
@@ -375,66 +385,142 @@ Definition ast_t_ind := ast_t_ind'.
 Definition exp_ind := exp_ind'.
 Definition pat_ind := pat_ind'.
 Definition dec_ind := dec_ind'.
+
 (** End induction principle *)
+(*-------------------------------------------------------------------*)
+
+(** Begin boolean equality *)
+(*-------------------------------------------------------------------*)
+
+Scheme Equality for list.
+Scheme Equality for ident.
+Scheme Equality for option.
+Scheme Equality for prod.
+
+Definition lit_beq (lit1 lit2 : lit) : bool :=
+  match lit1, lit2 with
+  | IntLit i1, IntLit i2 => Z.eqb i1 i2
+  | CharLit c1, CharLit c2 => Ascii.eqb c1 c2
+  | StrLit s1, StrLit s2 => String.eqb s1 s2
+  | Word8Lit w1, Word8Lit w2 => word_equality 8 w1 w2
+  | Word64Lit w1, Word64Lit w2 => word_equality 64 w1 w2
+  | _, _ => false
+  end.
+
+Fixpoint ast_t_beq (a1 a2 : ast_t) : bool :=
+  match a1, a2 with
+  | Atvar v1, Atvar v2 => String.eqb v1 v2
+  | Atfun a3 a4, Atfun a5 a6 => andb (ast_t_beq a3 a5) (ast_t_beq a4 a6)
+  | Attup l1, Attup l2 => list_beq _ ast_t_beq l1 l2
+  | Atapp l1 i1, Atapp l2 i2 => andb (list_beq _ ast_t_beq l1 l2)
+                                    (ident_beq _ _ String.eqb String.eqb i1 i2)
+  | _, _ => false
+  end.
+
+Definition constr_id_beq := option_beq _ (ident_beq _ _ String.eqb String.eqb).
+
+Fixpoint pat_beq (p1 p2 : pat) :=
+  match p1, p2 with
+  | Pvar s1, Pvar s2 => String.eqb s1 s2
+  | Pcon cid1 l1, Pcon cid2 l2 => andb (constr_id_beq cid1 cid2) (list_beq _ pat_beq l1 l2)
+  | _, _ => false
+  end.
+
+Arguments list_beq {_}.
+Arguments prod_beq {_} {_}.
+
+Fixpoint exp_beq (exp1 exp2 : exp) :=
+  match exp1, exp2 with
+  | ERaise e1, ERaise e2 => exp_beq e1 e2
+  | EHandle e1 l1, EHandle e2 l2 => andb (exp_beq e1 e2) (list_beq (prod_beq pat_beq exp_beq) l1 l2)
+  | ELit lit1, ELit lit2 => lit_beq lit1 lit2
+  | ECon c1 l1, ECon c2 l2 => andb (constr_id_beq c1 c2) (list_beq exp_beq l1 l2)
+  | EVar i1, EVar i2 => ident_beq _ _ String.eqb String.eqb i1 i2
+  | EFun v1 e1, EFun v2 e2 => andb (String.eqb v1 v2) (exp_beq e1 e2)
+  | EApp o1 l1, EApp o2 l2 => andb (op_beq o1 o2) (list_beq exp_beq l1 l2)
+  | ELog lo1 e1 e2, ELog lo2 e3 e4 => andb (andb (lop_beq lo1 lo2) (exp_beq e1 e3)) (exp_beq e2 e4)
+  | EIf c1 t1 e1, EIf c2 t2 e2 => andb (andb (exp_beq c1 c2) (exp_beq t1 t2)) (exp_beq e1 e2)
+  | EMat e1 l1, EMat e2 l2 => andb (exp_beq e1 e2) (list_beq (prod_beq pat_beq exp_beq) l1 l2)
+  | ELet o1 e1 e2, ELet o2 e3 e4 => andb (andb (option_beq _ String.eqb o1 o2) (exp_beq e1 e3))
+                                        (exp_beq e2 e4)
+  | ELetrec l1 e1, ELetrec l2 e2 => andb (list_beq (prod_beq
+                                                            (prod_beq String.eqb String.eqb)
+                                                            exp_beq) l1 l2)
+                                        (exp_beq e1 e2)
+  | ELannot e1 lc1, ELannot e2 lc2 => andb (exp_beq e1 e2) (list_beq  Nat.eqb lc1 lc2)
+  | _, _ => false
+  end.
+
+
+Definition typeDef_beq := list_beq (prod_beq (prod_beq (list_beq String.eqb) String.eqb) (list_beq (prod_beq String.eqb (list_beq ast_t_beq)))).
+
+Open Scope bool_scope.
+
+Fixpoint dec_beq (dec1 dec2 : dec) :=
+  match dec1, dec2 with
+  | Dlet l1 p1 e1, Dlet l2 p2 e2 => list_beq Nat.eqb l1 l2 && pat_beq p1 p2 && exp_beq e1 e2
+  | Dletrec l1 lvve1 , Dletrec l2 lvve2 => list_beq Nat.eqb l1 l2 &&
+                                            list_beq (prod_beq (prod_beq String.eqb String.eqb) exp_beq) lvve1 lvve2
+  | Dtype l1 t1, Dtype l2 t2 => list_beq Nat.eqb l1 l2 && typeDef_beq t1 t2
+  | Dtabbrev l1 lts1 tn1 ast1 , Dtabbrev l2 lts2 tn2 ast2 => list_beq Nat.eqb l1 l2 &&
+                                                              list_beq String.eqb lts1 lts2 &&
+                                                              String.eqb tn1 tn2 &&
+                                                              ast_t_beq ast1 ast2
+  | Dexn l1 cn1 last1, Dexn l2 cn2 last2 => list_beq Nat.eqb l1 l2 &&
+                                             String.eqb cn1 cn2 &&
+                                             list_beq ast_t_beq last1 last2
+  | Dmod mn1 ld1, Dmod mn2 ld2 => String.eqb mn1 mn2 &&
+                                   list_beq dec_beq ld1 ld2
+
+  | Dlocal ld11 ld12, Dlocal ld21 ld22 => list_beq dec_beq ld11 ld21 &&
+                                           list_beq dec_beq ld12 ld22
+  | _, _ => false
+  end.
+
+(** End boolean equality *)
 (*-------------------------------------------------------------------*)
 
 (** Decidable Equality for terms, patterns, and expressions *)
 (*-------------------------------------------------------------------*)
 
 Theorem lit_eq_dec (l l' : lit) : {l = l'} + {l <> l'}.
-  decide equality; auto with DecidableEquality.  Defined.
-Hint Resolve lit_eq_dec : DecidableEquality.
+  decide equality; auto with DecidableEquality. apply (word_eq_dec 8). apply (word_eq_dec 64). Defined.
+#[export] Hint Resolve lit_eq_dec : DecidableEquality.
 
-Theorem opn_eq_dec (o o' : opn) : {o = o'} + {o <> o'}.
- decide equality. Defined.
-Hint Resolve opn_eq_dec : DecidableEquality.
+(* Theorem opn_eq_dec (o o' : opn) : {o = o'} + {o <> o'}. *)
+(*  decide equality. Defined. *)
+#[export] Hint Resolve opn_eq_dec : DecidableEquality.
 
-Theorem opb_eq_dec (o o' : opn) : {o = o'} + {o <> o'}.
-  decide equality.
-Defined.
-Hint Resolve opb_eq_dec : DecidableEquality.
+(* Theorem opb_eq_dec (o o' : opn) : {o = o'} + {o <> o'}. *)
+(*   decide equality. *)
+(* Defined. *)
+#[export] Hint Resolve opb_eq_dec : DecidableEquality.
 
-Theorem opw_eq_dec (o o' : opn) : {o = o'} + {o <> o'}.
-  decide equality.
-Defined.
-Hint Resolve opw_eq_dec : DecidableEquality.
+(* Theorem opw_eq_dec (o o' : opn) : {o = o'} + {o <> o'}. *)
+(*   decide equality. *)
+(* Defined. *)
+#[export] Hint Resolve opw_eq_dec : DecidableEquality.
 
-Theorem shift_eq_dec (o o' : opn) : {o = o'} + {o <> o'}.
-  decide equality.
-Defined.
-Hint Resolve shift_eq_dec : DecidableEquality.
+(* Theorem shift_eq_dec (o o' : opn) : {o = o'} + {o <> o'}. *)
+(*   decide equality. *)
+(* Defined. *)
+#[export] Hint Resolve shift_eq_dec : DecidableEquality.
 
-Theorem op_eq_dec : forall (o0 o1 : op), {o0 = o1} + {o0 <> o1}.
-Proof.
-  decide equality.
-  - decide equality.
-  - decide equality.
-  - decide equality.
-  - decide equality.
-  - decide equality.
-  - decide equality.
-  - decide equality.
-  - decide equality.
-  - decide equality.
-  - decide equality.
-  - destruct f. destruct f0. left. reflexivity.
-  - decide equality.
-  - decide equality.
-  - decide equality.
-  - apply string_dec.
-Defined.
+(* Theorem op_eq_dec : forall (o0 o1 : op), {o0 = o1} + {o0 <> o1}. *)
+(* Proof. *)
+(*   decide equality; try (apply string_dec); decide equality. *)
+(* Defined. *)
+#[export] Hint Resolve op_eq_dec : DecidableEquality.
 
-Hint Resolve op_eq_dec : DecidableEquality.
-
-Theorem lop_eq_dec : forall (l0 l1 : lop), {l0 = l1} + {l0 <> l1}.
-Proof. decide equality.  Defined.
-Hint Resolve lop_eq_dec : DecidableEquality.
+(* Theorem lop_eq_dec : forall (l0 l1 : lop), {l0 = l1} + {l0 <> l1}. *)
+(* Proof. decide equality.  Defined. *)
+#[export] Hint Resolve lop_eq_dec : DecidableEquality.
 
 Theorem ast_t_eq_dec : forall (a1 a2 : ast_t), {a1 = a2} + {a1 <> a2}.
 Proof.
-  decide equality.
-  - apply string_dec.
-  - generalize dependent l0. induction X; destruct l0.
+  decide equality;
+    auto with DecidableEquality.
+  - generalize dependent l0; induction X; destruct l0.
     left; reflexivity.
     right; congruence.
     right; congruence.
@@ -442,7 +528,6 @@ Proof.
     left; reflexivity.
     right; congruence.
     right; congruence.
-  - apply ident_eq_dec; apply string_dec.
   - generalize dependent l0. induction X; destruct l0.
     left; reflexivity.
     right; congruence.
@@ -453,151 +538,141 @@ Proof.
     right; congruence.
     right. congruence.
 Defined.
-Hint Resolve ast_t_eq_dec : DecidableEquality.
+#[export] Hint Resolve ast_t_eq_dec : DecidableEquality.
 
 Theorem constr_id_eq_dec : forall (c0 c1 : constr_id), {c0 = c1} + {c0 <> c1}.
 Proof.
   decide equality. auto with DecidableEquality.  Defined.
-Hint Resolve constr_id_eq_dec : DecidableEquality.
+#[export] Hint Resolve constr_id_eq_dec : DecidableEquality.
 
 Theorem pat_eq_dec : forall (p0 p1 : pat), {p0 = p1} + {p0 <> p1}.
 Proof.
-  induction p0 using pat_rect'; destruct p1; try (right; congruence).
-  destruct (string_dec v v0); try (subst; left; congruence); try (right; congruence).
-  generalize dependent l0.
-  induction X; destruct l0; try (right; congruence).
-  destruct (constr_id_eq_dec o c); subst.
-  left; congruence.
-  right; congruence.
-  destruct (p p0); try (right; congruence).
-  destruct (IHX l0); try (right; congruence).
-  inv e0.
-  left; reflexivity.
+  decide equality; auto with DecidableEquality.
+  generalize dependent l0;
+  induction X; destruct l0; try (right; congruence); try (left; reflexivity).
+  destruct (IHX l0); destruct (p p2); subst; try (left; reflexivity); try (right; congruence).
 Defined.
-Hint Resolve pat_eq_dec : DecidableEquality.
+#[export] Hint Resolve pat_eq_dec : DecidableEquality.
 
 Theorem typeDef_eq_dec : forall (t0 t1 : typeDef), {t0 = t1} + {t0 <> t1}.
-Proof. decide equality. decide equality.
-       apply list_eq_dec; decide equality; auto with DecidableEquality.
-       auto with DecidableEquality.  Defined.
-Hint Resolve typeDef_eq_dec : DecidableEquality.
+Proof. decide equality; auto with DecidableEquality.  Defined.
+#[export] Hint Resolve typeDef_eq_dec : DecidableEquality.
 
 Theorem locs_eq_dec : forall (l0 l1 : locs), {l0 = l1} + {l0 <> l1}.
 Proof.
-  decide equality.
-  auto with DecidableEquality.
+  decide equality; auto with DecidableEquality.
 Defined.
-Hint Resolve locs_eq_dec : DecidableEquality.
+#[export] Hint Resolve locs_eq_dec : DecidableEquality.
 
 Ltac tryr := try (right; congruence).
 Ltac tryl := try (left; congruence).
 
-Theorem exp_eq_dec : forall (e0 e1 : exp), {e0 = e1} + {e0 <> e1}.
-Proof.
-  induction e0 using exp_rect'; destruct e1; try (right; congruence).
-  - destruct (IHe0 e1); tryl; tryr.
-  - generalize dependent l0.
-    induction X; destruct l0; destruct (IHe0 e1); tryl; tryr.
-    destruct x. destruct p0.
-    simpl in *. destruct (p e3).
-    destruct (pat_eq_dec p1 p0).
-    destruct (IHX l0).
-    tryl.
-    tryr.
-    tryr.
-    tryr.
-  - destruct (lit_eq_dec l l0); tryl; tryr.
-  - destruct (constr_id_eq_dec o c); try (right; congruence).
-    generalize dependent l0.
-    induction X; destruct l0; try (right; congruence).
-    subst; left; congruence.
-    destruct (IHX l0); try (right; congruence).
-    destruct (p e0); try (right; congruence).
-    inv e1. left; reflexivity.
-  - destruct (ident_eq_dec _ _ string_dec string_dec i i0); subst.
-    left; congruence.
-    right; congruence.
-  - destruct (string_dec v v0); tryr.
-    destruct (IHe0 e1); tryr.
-    tryl.
-  - generalize dependent l0.
-    destruct (op_eq_dec o o0); tryr.
-    induction X; intros; destruct l0; tryr.
-    subst; tryl.
-    destruct (IHX l0); tryr.
-    destruct (p e0); tryr.
-    inv e1; subst.
-    tryl.
-  - destruct (IHe0_1 e1_1); tryr.
-    destruct (IHe0_2 e1_2); tryr.
-    destruct (lop_eq_dec lo l); tryl; tryr.
-  - destruct (IHe0_1 e1_1).
-    destruct (IHe0_2 e1_2).
-    destruct (IHe0_3 e1_3).
-    subst. tryl.
-    tryr.
-    tryr.
-    tryr.
-  - generalize dependent l0.
-    destruct (IHe0 e1); tryr.
-    induction X; destruct l0; tryr.
-    subst; tryl.
-    destruct (IHX l0); tryr.
-    destruct x.
-    destruct p0.
-    simpl in *.
-    destruct (p e4); tryr.
-    destruct (pat_eq_dec p1 p0); tryr.
-    subst; inv e2; tryl.
-  - destruct (option_eq_dec _ string_dec o o0); tryr.
-    destruct (IHe0_1 e1_1); tryr.
-    destruct (IHe0_2 e1_2); tryl; tryr.
-  - destruct (IHe0 e1); tryr.
-    generalize dependent l. induction X; intro l0; destruct l0; tryl; tryr.
-    destruct x. destruct p1. destruct p0. destruct p0.
-    simpl in p.
-    destruct (IHX l0); tryr.
-    destruct (string_dec v v1); tryr.
-    destruct (string_dec v0 v2); tryr.
-    destruct (p e3); tryl; tryr.
-  - destruct (locs_eq_dec l l0); tryr.
-    destruct (IHe0 e1); tryr.
-    subst; tryl.
-Defined.
-Hint Resolve exp_eq_dec : DecidableEquality.
-Instance EqDec_exp : EqDec exp := exp_eq_dec.
+(* Theorem exp_eq_dec : forall (e0 e1 : exp), {e0 = e1} + {e0 <> e1}. *)
+(* Proof. *)
+(*   induction e0 using exp_rect'; destruct e1; try (right; congruence); auto with DecidableEquality. *)
+(*   - destruct (IHe0 e1); tryl; tryr. *)
+(*   - generalize dependent l0. *)
+(*     induction X; destruct l0; destruct (IHe0 e1); tryl; tryr. *)
+(*     destruct x. destruct p0. *)
+(*     simpl in *. destruct (p e3). *)
+(*     destruct (pat_eq_dec p1 p0). *)
+(*     destruct (IHX l0). *)
+(*     tryl. *)
+(*     tryr. *)
+(*     tryr. *)
+(*     tryr. *)
+(*   - destruct (lit_eq_dec l l0); tryl; tryr. *)
+(*   - destruct (constr_id_eq_dec o c); try (right; congruence). *)
+(*     generalize dependent l0. *)
+(*     induction X; destruct l0; try (right; congruence). *)
+(*     subst; left; congruence. *)
+(*     destruct (IHX l0); try (right; congruence). *)
+(*     destruct (p e0); try (right; congruence). *)
+(*     inv e1. left; reflexivity. *)
+(*   - destruct (ident_eq_dec _ _ String.eqb String.eqb i i0); subst. *)
+(*     left; congruence. *)
+(*     right; congruence. *)
+(*   - destruct (string_dec v v0); tryr. *)
+(*     destruct (IHe0 e1); tryr. *)
+(*     tryl. *)
+(*   - generalize dependent l0. *)
+(*     destruct (op_eq_dec o o0); tryr. *)
+(*     induction X; intros; destruct l0; tryr. *)
+(*     subst; tryl. *)
+(*     destruct (IHX l0); tryr. *)
+(*     destruct (p e0); tryr. *)
+(*     inv e1; subst. *)
+(*     tryl. *)
+(*   - destruct (IHe0_1 e1_1); tryr. *)
+(*     destruct (IHe0_2 e1_2); tryr. *)
+(*     destruct (lop_eq_dec lo l); tryl; tryr. *)
+(*   - destruct (IHe0_1 e1_1). *)
+(*     destruct (IHe0_2 e1_2). *)
+(*     destruct (IHe0_3 e1_3). *)
+(*     subst. tryl. *)
+(*     tryr. *)
+(*     tryr. *)
+(*     tryr. *)
+(*   - generalize dependent l0. *)
+(*     destruct (IHe0 e1); tryr. *)
+(*     induction X; destruct l0; tryr. *)
+(*     subst; tryl. *)
+(*     destruct (IHX l0); tryr. *)
+(*     destruct x. *)
+(*     destruct p0. *)
+(*     simpl in *. *)
+(*     destruct (p e4); tryr. *)
+(*     destruct (pat_eq_dec p1 p0); tryr. *)
+(*     subst; inv e2; tryl. *)
+(*   - destruct (option_eq_dec _ string_dec o o0); tryr. *)
+(*     destruct (IHe0_1 e1_1); tryr. *)
+(*     destruct (IHe0_2 e1_2); tryl; tryr. *)
+(*   - destruct (IHe0 e1); tryr. *)
+(*     generalize dependent l. induction X; intro l0; destruct l0; tryl; tryr. *)
+(*     destruct x. destruct p1. destruct p0. destruct p0. *)
+(*     simpl in p. *)
+(*     destruct (IHX l0); tryr. *)
+(*     destruct (string_dec v v1); tryr. *)
+(*     destruct (string_dec v0 v2); tryr. *)
+(*     destruct (p e3); tryl; tryr. *)
+(*   - destruct (locs_eq_dec l l0); tryr. *)
+(*     destruct (IHe0 e1); tryr. *)
+(*     subst; tryl. *)
+(* Defined. *)
+(* Hint Resolve exp_eq_dec : DecidableEquality. *)
+(* Instance EqDec_exp : EqDec exp := exp_eq_dec. *)
 
-Theorem dec_eq_dec : forall (d0 d1 : dec), {d0 = d1} + {d0 <> d1}.
-Proof.
-  decide equality; try (auto with DecidableEquality).
-  - generalize dependent l. induction X; intros l'; destruct l'.
-    left; reflexivity.
-    right; congruence.
-    right; congruence.
-    destruct (IHX l').
-    destruct (p d).
-    subst; left; reflexivity.
-    right; congruence.
-    right; congruence.
-  - generalize dependent l0. induction X0; intros l'; destruct l'.
-    left; reflexivity.
-    right; congruence.
-    right; congruence.
-    destruct (IHX0 l').
-    destruct (p d).
-    subst; left; reflexivity.
-    right; congruence.
-    right; congruence.
-  - generalize dependent l. induction X; intros l'; destruct l'.
-    left; reflexivity.
-    right; congruence.
-    right; congruence.
-    destruct (IHX l').
-    destruct (p d).
-    subst; left; reflexivity.
-    right; congruence.
-    right; congruence.
-Defined.
-Hint Resolve dec_eq_dec : DecidableEquality.
+(* Theorem dec_eq_dec : forall (d0 d1 : dec), {d0 = d1} + {d0 <> d1}. *)
+(* Proof. *)
+(*   decide equality; try (auto with DecidableEquality). *)
+(*   - generalize dependent l. induction X; intros l'; destruct l'. *)
+(*     left; reflexivity. *)
+(*     right; congruence. *)
+(*     right; congruence. *)
+(*     destruct (IHX l'). *)
+(*     destruct (p d). *)
+(*     subst; left; reflexivity. *)
+(*     right; congruence. *)
+(*     right; congruence. *)
+(*   - generalize dependent l0. induction X0; intros l'; destruct l'. *)
+(*     left; reflexivity. *)
+(*     right; congruence. *)
+(*     right; congruence. *)
+(*     destruct (IHX0 l'). *)
+(*     destruct (p d). *)
+(*     subst; left; reflexivity. *)
+(*     right; congruence. *)
+(*     right; congruence. *)
+(*   - generalize dependent l. induction X; intros l'; destruct l'. *)
+(*     left; reflexivity. *)
+(*     right; congruence. *)
+(*     right; congruence. *)
+(*     destruct (IHX l'). *)
+(*     destruct (p d). *)
+(*     subst; left; reflexivity. *)
+(*     right; congruence. *)
+(*     right; congruence. *)
+(* Defined. *)
+(* Hint Resolve dec_eq_dec : DecidableEquality. *)
 
 (*-------------------------------------------------------------------*)
