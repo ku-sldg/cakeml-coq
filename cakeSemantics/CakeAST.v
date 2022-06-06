@@ -281,7 +281,6 @@ Definition exp_rect_helper' (P : exp -> Type) (p : varN * varN * exp) : Type :=
   | (x, y, z) => P z
   end.
 
-Print ETannot.
 Fixpoint exp_rect' (P : exp -> Type)
          (H  : forall (e' : exp), P e' -> P (ERaise e'))
          (H0 : forall (e' : exp) (l : list (pat * exp)), P e' ->

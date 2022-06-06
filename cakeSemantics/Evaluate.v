@@ -190,7 +190,6 @@ Definition natFromInteger (size : nat) :=
 Definition word8FromInteger (i : Z) : word 8 := nat_to_word 8 (natFromInteger 8 i)%nat .
 Definition word64FromInteger (i : Z) : word 64 :=  nat_to_word 64 (natFromInteger 64%nat i).
 
-Print op.
 (* Missing floating point and real number operations *)
 Definition do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
   : option (store_ffi ffi' val * result val val) :=
@@ -554,7 +553,7 @@ Equations size_exp (e : exp) : nat :=
 | ELetrec vve e' => 1 + size_exp e' + size_vve vve;
 | EFun _ e' => 1 + size_exp e';
 | ERaise e' => 1 + size_exp e';
-(* | ETannot e' _ *)
+| ETannot e' _ => 1 + size_exp e';
 | ELannot e' _ => 1 + size_exp e';
 | ECon _ es => 1 + size_exps es;
 | EApp _ es => 1 + size_exps es;
@@ -922,6 +921,8 @@ Equations? eval_or_match (sel : bool) (es : if sel then list exp else list (pat 
     then eval_or_match true [e] fuel st (update_sev env (build_rec_env funs env (sev env))) uu uu
     else (st, Rerr (Rabort Rtype_error));
 
+  eval_or_match true [ETannot e t] fuel st env _ _ => eval_or_match true [e] fuel st env uu uu;
+
   eval_or_match true [ELannot e l] fuel st env _ _ => eval_or_match true [e] fuel st env uu uu;
 
   eval_or_match false [] _ st _ _ err_v => (st, Rerr (Rraise err_v));
@@ -1098,6 +1099,8 @@ Proof.
  - simp eval_or_match in H.
 
  - simp eval_or_match in H.
+
+ - simp eval_or_match in H.
    destruct (eval_or_match true [e] (S f) st env uu uu) eqn:H'; simpl in *;
      break_match; inv H.
    break_match; inv H.
@@ -1186,6 +1189,9 @@ Proof.
     break_match; eauto; inv H.
 
  - simp eval_or_match in H.
+
+ - simp eval_or_match in H.
+
 Qed.
 
 Theorem eval_or_match_true_ignore : forall (st : state nat) (env : sem_env val) (es : list exp) (f : nat)
