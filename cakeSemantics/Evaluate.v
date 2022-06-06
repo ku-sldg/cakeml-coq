@@ -2,21 +2,24 @@ Require Import CakeSem.Utils.
 Require Import CakeSem.ffi.FFI.
 Require Import CakeSem.Namespace.
 Require Import CakeSem.CakeAST.
-Require Import CakeSem.FreeVars.
 Require Import CakeSem.SemanticsAux.
-
 Require Import StructTact.StructTactics.
-Require Import PeanoNat.
+
+Require Import Equations.Prop.Equations.
+
+Require Import Ascii.
 Require Import List.
 Require Import ListDec.
-Require Import Ascii.
-Import Peano_dec.
-Import ZArith_dec.
 Import ListNotations.
-
 Require Import Lia.
+Require Import PeanoNat.
+Require Import Peano_dec.
+Require Import ZArith.
+Require Import ZArith.Zdigits.
+Require Import Zbool.
 
-Set Equations With UIP.
+(* Require Import Coq.Wellfounded.Lexicographic_Product. *)
+(* Require Import Relation_Operators. *)
 (* ---------------------------------------------------------------------- *)
 (** ** Helper functions *)
 Definition ident_string_dec := Namespace.ident_eq_dec _ _ string_dec string_dec.
@@ -39,20 +42,7 @@ Definition same_ctor (s1 s2 : stamp) : bool :=
   if stamp_eq_dec s1 s2 then true else false.
 
 (* ---------------------------------------------------------------------- *)
-(** ** Constructor construction *)
-
-(* Definition build_conv (envC : env_ctor) (cn : constr_id) (vs : list val) : option val := *)
-(*   match cn with *)
-(*   | None => Some (Conv None vs) *)
-(*   | Some id => match nsLookup ident_ id envC with *)
-(*               | None => None *)
-(*               | Some (len,stamp) => Some (Conv (Some stamp) vs) *)
-(*               end *)
-(*   end. *)
-
-(* ---------------------------------------------------------------------- *)
 (** ** Pattern matcher *)
-
 
 (* A big-step pattern matcher.  If the value matches the pattern, return an
  * environment with the pattern variables bound to the corresponding sub-terms
@@ -62,66 +52,55 @@ Definition same_ctor (s1 s2 : stamp) : bool :=
  * number of arguments, and constructors in corresponding positions in the
  * pattern and value come from the same type.  Match_type_error is returned
  * when one of these conditions is violated *)
-Fixpoint pmatch (envC : env_ctor) (s : store val) (p : pat) (v : val)
-         (env : alist varN val) : match_result (alist varN val) :=
-  let fix pmatch_list (envC : env_ctor) (s : store val) (ps : list pat)
-          (vs : list val) (env : alist varN val ) : match_result (alist varN val) :=
-      match ps, vs with
-      | [], [] => Match env
-      | p::ps', v'::vs' =>
-        (* Another way to do it (I THINK?) *)
-        (* match pmatch envC s p v' env as res with
-         * | Match env' => pmatch_list envC s ps' vs' env'
-         * | _ => res
-         * end *)
-        match pmatch envC s p v' env with
-        | No_match => No_match
-        | Match_type_error => Match_type_error
-        | Match env' => pmatch_list envC s ps' vs' env'
-        end
-      | _, _ => Match_type_error
-      end
-  in
-  match p, v with
-  (* | Pany, v' => Match env *)
-  | Pvar x, v' => Match ((x,v')::env)
-  (* | Plit l, Litv l' => if lit_eq_dec l l' *)
-  (*                     then Match env *)
-  (*                     else if lit_same_type l l' *)
-  (*                          then No_match *)
-  (*                          else Match_type_error *)
-  | Pcon (Some n) ps, Conv (Some stamp') vs =>
-    match  nsLookup ident_string_beq n envC with
-    | Some (l, stamp) =>  if stamp_eq_dec stamp stamp'
-                         then if eq_nat_dec (length ps) l (* TODO: suspicious redundant test *)
-                              then pmatch_list envC s ps vs env
-                              else Match_type_error
-                         else No_match
-    | _ => Match_type_error
-    end
-  | Pcon None ps, Conv None vs => pmatch_list envC s ps vs env
-  (* I think this is just as fast? Actually...
-   * maybe not though due to extra stuff happening on matches *)
-  (* ORIG: *)
-  (* if eqb (length ps) (length vs) *)
-  (* then pmatch_list envC s ps vs env *)
-  (* else Match_type_error *)
-  (* | Pref p, Loc lnum => match store_lookup lnum s with *)
-  (*                      | Some (Refv v) => pmatch envC s p v env *)
-  (*                      | Some _ => Match_type_error *)
-  (*                      | None => Match_type_error *)
-  (*                      end *)
-  (* | Ptannot p t, val' => pmatch envC s p val' env *)
-  | _, _ => Match_type_error
-  end.
 
+Open Scope bool_scope.
+Equations pmatch : env_ctor -> store val -> pat -> val -> alist varN val -> match_result (alist varN val) :=
+  pmatch _ _ Pany _ env => Match env;
+  pmatch _ _ (Pvar x) v env => Match ((x,v)::env);
+  pmatch _ _ (Plit l) (Litv l') env => if lit_beq l l'
+                                         then Match env
+                                         else if lit_same_type l l'
+                                              then No_match
+                                              else Match_type_error;
+  pmatch envC s (Pcon (Some cid) ps) (Conv (Some stamp) vs) env with nsLookup ident_string_beq cid envC := {
+      pmatch envC s (Pcon (Some cid) ps) (Conv (Some stamp) vs) env None => Match_type_error;
+      pmatch envC s (Pcon (Some cid) ps) (Conv (Some stamp) vs) env (Some (l, stamp')) =>
+        if stamp_same_type stamp stamp' && (length ps =? l)
+        then if same_ctor stamp stamp'
+             then if length vs =? l
+                  then pmatch_list envC s ps vs env
+                  else Match_type_error
+             else No_match
+        else Match_type_error };
+
+  pmatch envC _ (Pcon None ps) (Conv None vs) env => if length ps =? length vs
+                                                    then pmatch_list envC s ps vs env
+                                                    else Match_type_error;
+  pmatch envC s (Pref p) (Loc lnum) env with store_lookup lnum s => {
+      pmatch envC s (Pref p) (Loc lnum) env None => Match_type_error;
+      pmatch envC s (Pref p) (Loc lnum) env (Some (Refv v)) => pmatch envC s p v env;
+      pmatch envC s (Pref p) (Loc lnum) env (Some (W8array _)) => Match_type_error;
+      pmatch envC s (Pref p) (Loc lnum) env (Some (Varray _))  => Match_type_error
+    };
+  pmatch envC _ (Pas p i) v env => pmatch envC s p v ((i,v)::env);
+  pmatch envC _ (Ptannot p _) v env => pmatch envC s p v env;
+  pmatch _ _ _ _ _ => Match_type_error;
+
+where pmatch_list : env_ctor -> store val -> list pat -> list val -> alist varN val -> match_result (alist varN val) :=
+  pmatch_list _ _ [] [] env => Match env;
+  pmatch_list envC s (p::ps) (v::vs) env with pmatch envC s p v env => {
+      pmatch_list envC s (p::ps) (v::vs) env No_match => No_match;
+      pmatch_list envC s (p::ps) (v::vs) env Match_type_error => Match_type_error ;
+      pmatch_list envC s (p::ps) (v::vs) env (Match env') => pmatch_list envC s ps vs env';
+    };
+  pmatch_list _ _ _ _ _ => Match_type_error.
 
 (* ---------------------------------------------------------------------- *)
 (** ** Typechecks *)
 
 Definition do_con_check (cenv : env_ctor)
            (n_opt : constr_id)
-           (l : nat) : bool := (* LATER: switch to Prop *)
+           (l : nat) : bool :=
   match n_opt with
   | None => true
   | Some n => match nsLookup ident_string_beq n cenv with
@@ -129,7 +108,6 @@ Definition do_con_check (cenv : env_ctor)
              | Some (l',_) => if Nat.eqb l l' then true else false
              end
   end.
-
 
 (* ---------------------------------------------------------------------- *)
 (** ** Equality test *)
@@ -175,20 +153,14 @@ Fixpoint do_eq (v1 v2 : val) : eq_result :=
 (* ---------------------------------------------------------------------- *)
 (** ** Function call *)
 
-(* BACKPORT: the variable [n] should not be rebound, it's very confusing;
-   the first one should be [nfun], the second one [narg] or just [n], but
-   named in a consistant way with the non-recursive closure case. *)
-(* LATER: not needed in the relational bigstep *)
-
-
 Definition do_opapp (vs : list val) : option (sem_env val * exp) :=
   match vs with
-  | (Closure env n e)::v::[] =>
-    Some (update_sev env (nsBind n v (sev env)), e)
-  | (Recclosure env funs n)::v::[] =>
+  | (Closure env nfun e)::v::[] =>
+    Some (update_sev env (nsBind nfun v (sev env)), e)
+  | (Recclosure env funs nfun)::v::[] =>
     if NoDuplicates_dec String.string_dec
                  (List.map (fun p => match p with (f,x,e) => f end) funs)
-    then match find_recfun n funs with
+    then match find_recfun nfun funs with
          | Some (n,e) =>
             let sev' := nsBind n v (build_rec_env funs env (sev env)) in
             Some (update_sev env sev', e)
@@ -214,266 +186,328 @@ Definition natFromInteger (size : nat) :=
       end
   in helper size.
 
+
 Definition word8FromInteger (i : Z) : word 8 := nat_to_word 8 (natFromInteger 8 i)%nat .
 Definition word64FromInteger (i : Z) : word 64 :=  nat_to_word 64 (natFromInteger 64%nat i).
 
+Print op.
+(* Missing floating point and real number operations *)
 Definition do_app (ffi' : Type) (st : store_ffi ffi' val) (o : op) (vs : list val)
   : option (store_ffi ffi' val * result val val) :=
-  match st with
-    (s, t) =>
-    match o, vs with
-    | ListAppend, [x1;x2] =>
+  let '(s,t) := st in
+  match o, vs with
+  | ListAppend, [x1;x2] =>
       match val_to_list x1, val_to_list x2 with
       | Some xs, Some ys =>
-        Some ((s,t), Rval (list_to_val (xs ++ ys)))
+          Some (st, Rval (list_to_val (xs ++ ys)))
       | _, _ => None
       end
-    | Opn o', [Litv (IntLit n1); Litv (IntLit n2)] =>
-      if andb (Z.eqb n2 0) (orb (opn_beq o' Divide) (opn_beq o' Modulo))
-        then Some ((s,t), Rerr (Rraise div_exn_v))
-        else Some ((s,t), Rval (Litv (IntLit (opn_lookup o' n1 n2))))
-    | Opb o', [Litv (IntLit n1); Litv (IntLit n2)] =>
-      Some ((s,t), Rval (Boolv (opb_lookup o' n1 n2)))
-    | Opw W8 o', [Litv (Word8Lit w1); Litv (Word8Lit w2)] =>
-      Some ((s,t), Rval (Litv (Word8Lit (opw8_lookup o' w1 w2))))
-    | Opw W64 o', [Litv (Word64Lit w1); Litv (Word64Lit w2)] =>
-      Some ((s,t), Rval (Litv (Word64Lit (opw64_lookup o' w1 w2))))
-    (* | FP_bop bop, [Litv (Word64Lit w1); Litv (Word64Lit w2)] => *)
-    (*     Some ((s,t),Rval (Litv (Word64Lit (fp_bop bop w1 w2)))) *)
-    (* | FP_uop uop, [Litv (Word64Lit w)] => *)
-    (*   Some ((s,t),Rval (Litv (Word64Lit (fp_uop uop w)))) *)
-    (* | FP_cmp cmp, [Litv (Word64Lit w1); Litv (Word64Lit w2)] => *)
-    (*   Some ((s,t),Rval (Boolv (fp_cmp cmp w1 w2))) *)
-    | Shift W8 o' n, [Litv (Word8Lit w)] =>
-      Some ((s,t), Rval (Litv (Word8Lit (shift8_lookup o' w n))))
-    | Shift W64 o' n, [Litv (Word64Lit w)] =>
-      Some ((s,t), Rval (Litv (Word64Lit (shift64_lookup o' w n))))
-    | Equality, [v1; v2] =>
+  | Opn o', [Litv (IntLit n1); Litv (IntLit n2)] =>
+      if  (Z.eqb n2 0) && ((opn_beq o' Divide) || (opn_beq o' Modulo))
+      then Some (st, Rerr (Rraise div_exn_v))
+      else Some (st, Rval (Litv (IntLit (opn_lookup o' n1 n2))))
+  | Opb o', [Litv (IntLit n1); Litv (IntLit n2)] =>
+      Some (st, Rval (Boolv (opb_lookup o' n1 n2)))
+  | Opw W8 o', [Litv (Word8Lit w1); Litv (Word8Lit w2)] =>
+      Some (st, Rval (Litv (Word8Lit (opw8_lookup o' w1 w2))))
+  | Opw W64 o', [Litv (Word64Lit w1); Litv (Word64Lit w2)] =>
+      Some (st, Rval (Litv (Word64Lit (opw64_lookup o' w1 w2))))
+  (* | FP_bop bop, [Litv (Word64Lit w1); Litv (Word64Lit w2)] => *)
+  (*     Some ((s,t),Rval (Litv (Word64Lit (fp_bop bop w1 w2)))) *)
+  (* | FP_uop uop, [Litv (Word64Lit w)] => *)
+  (*   Some ((s,t),Rval (Litv (Word64Lit (fp_uop uop w)))) *)
+  (* | FP_cmp cmp, [Litv (Word64Lit w1); Litv (Word64Lit w2)] => *)
+  (*   Some ((s,t),Rval (Boolv (fp_cmp cmp w1 w2))) *)
+  | Shift W8 o' n, [Litv (Word8Lit w)] =>
+      Some (st, Rval (Litv (Word8Lit (shift8_lookup o' w n))))
+  | Shift W64 o' n, [Litv (Word64Lit w)] =>
+      Some (st, Rval (Litv (Word64Lit (shift64_lookup o' w n))))
+  | Equality, [v1; v2] =>
       match do_eq v1 v2 with
       | Eq_type_error => None
-      | Eq_val b => Some ((s,t), Rval (Boolv b))
+      | Eq_val b => Some (st, Rval (Boolv b))
       end
-    | Opassign, [Loc lnum; v] =>
+  | Opassign, [Loc lnum; v] =>
       match store_assign lnum (Refv v) s with
       | Some s' => Some ((s',t), Rval (Conv None []))
       | None => None
       end
-    | Opref, [v] =>
+  | Opref, [v] =>
       let (s',n) := store_alloc (Refv v) s in
       Some ((s',t), Rval (Loc n))
-    | Opderef, [Loc n] =>
+  | Opderef, [Loc n] =>
       match store_lookup n s with
-      | Some (Refv v) => Some ((s,t), Rval v)
+      | Some (Refv v) => Some (st, Rval v)
       | _ => None
       end
-    | Aw8alloc, [Litv (IntLit n); Litv (Word8Lit w)] =>
-      if (Z_lt_dec n 0)%Z then
-        Some ((s,t), Rerr (Rraise sub_exn_v))
+  | Aw8alloc, [Litv (IntLit n); Litv (Word8Lit w)] =>
+      if (n <? 0)%Z then
+        Some (st, Rerr (Rraise sub_exn_v))
       else
         let (s',lnum) := store_alloc (W8array (List.repeat w (Z.to_nat n))) s
         in Some ((s',t), Rval (Loc lnum))
-    | Aw8sub, [Loc lnum; Litv (IntLit i)] =>
+  | Aw8sub, [Loc lnum; Litv (IntLit i)] =>
       match store_lookup lnum s with
       | Some (W8array ws) =>
-        if (Z_lt_dec i 0)%Z
-        then Some ((s,t), Rerr (Rraise sub_exn_v))
-        else
-          let n := Z.to_nat i in
-          match List.nth_error ws n with
-          | None => Some ((s,t), Rerr (Rraise sub_exn_v))
-          | Some n' => Some ((s,t), Rval (Litv (Word8Lit n')))
-          end
-      | _ => None
-      end
-    | Aw8length, [Loc n] =>
-      match store_lookup n s with
-      | Some (W8array ws) => Some ((s,t), Rval (Litv (IntLit (ZArith.Zcomplements.Zlength ws))))
-      | _ => None
-      end
-    | Aw8update, [Loc lnum; Litv (IntLit i); Litv (Word8Lit w)] =>
-      match store_lookup lnum s with
-      | Some (W8array ws) =>
-        if (Z_lt_dec i 0)%Z then
-          Some ((s,t), Rerr (Rraise sub_exn_v))
-        else
-          let n := Z.to_nat i in
-          if Nat.leb (List.length ws) n then
-            Some ((s,t), Rerr (Rraise sub_exn_v))
+          if (i <? 0)%Z
+          then Some (st, Rerr (Rraise sub_exn_v))
           else
-            match store_assign lnum (W8array (update n w ws)) s with
-            | None => None
-            | Some s' => Some ((s',t), Rval (Conv None []))
+            let n := Z.to_nat i in
+            match List.nth_error ws n with
+            | None => Some (st, Rerr (Rraise sub_exn_v))
+            | Some n' => Some (st, Rval (Litv (Word8Lit n')))
             end
       | _ => None
       end
-    | WordFromInt W8, [Litv (IntLit i)] =>
-      Some ((s,t), Rval (Litv (Word8Lit (word8FromInteger i))))
-    | WordFromInt W64, [Litv (IntLit i)] =>
-      Some ((s,t), Rval (Litv (Word64Lit (word64FromInteger i))))
-    | WordToInt W8, [Litv (Word8Lit w)] =>
-      Some ((s,t), Rval (Litv (IntLit (Z.of_nat (word_to_nat _ w)))))
-    | WordToInt W64, [Litv (Word64Lit w)] =>
-      Some ((s,t), Rval (Litv (IntLit (Z.of_nat (word_to_nat _ w)))))
-    | CopyStrStr, [Litv (StrLit str); Litv (IntLit off); Litv (IntLit len)] =>
-      Some ((s,t),
-            match copy_array (string_to_list_char str,off) len None with
-            | None => Rerr (Rraise sub_exn_v)
-            | Some cs => Rval (Litv (StrLit (list_char_to_string cs)))
-            end)
-    | CopyStrAw8, [Litv (StrLit str); Litv (IntLit off); Litv (IntLit len);
-                     Loc dst; Litv (IntLit dstoff)] =>
+  | Aw8sub_unsafe, [Loc lnum; Litv (IntLit i)] =>
+      match store_lookup lnum s with
+      | Some (W8array ws) =>
+          if (i <? 0)%Z
+          then None
+          else let n := Z.abs_nat i in
+               if ((length ws) <=? n)
+               then None
+               else Some (st, Rval (Litv (Word8Lit (nat_to_word 8 n))))
+      | _ => None
+      end
+  | Aw8length, [Loc n] =>
+      match store_lookup n s with
+      | Some (W8array ws) => Some (st, Rval (Litv (IntLit (Zlength ws))))
+      | _ => None
+      end
+  | Aw8update, [Loc lnum; Litv (IntLit i); Litv (Word8Lit w)] =>
+      match store_lookup lnum s with
+      | Some (W8array ws) =>
+          if (i <? 0)%Z
+          then Some (st, Rerr (Rraise sub_exn_v))
+          else let n := Z.abs_nat i in
+               if (length ws) <=? n
+               then Some (st, Rerr (Rraise sub_exn_v))
+               else match store_assign lnum (W8array (update n w ws)) s with
+                    | None => None
+                    | Some s' => Some ((s',t), Rval (Conv None []))
+                    end
+      | _ => None
+      end
+  | Aw8update_unsafe, [Loc lnum; Litv (IntLit i); Litv (Word8Lit w)] =>
+      match store_lookup lnum s with
+      | Some (W8array ws) =>
+          if (i <? 0)%Z
+          then None
+          else let n := Z.abs_nat i in
+               if (length ws) <=? n
+               then None
+               else match store_assign lnum (W8array (update n w ws)) s with
+                    | None => None
+                    | Some s' => Some ((s',t), Rval (Conv None []))
+                    end
+      | _ => None
+      end
+  | WordFromInt W8, [Litv (IntLit i)] =>
+      Some (st, Rval (Litv (Word8Lit (word8FromInteger i))))
+  | WordFromInt W64, [Litv (IntLit i)] =>
+      Some (st, Rval (Litv (Word64Lit (word64FromInteger i))))
+  | WordToInt W8, [Litv (Word8Lit w)] =>
+      Some (st, Rval (Litv (IntLit (Z.of_nat (word_to_nat _ w)))))
+  | WordToInt W64, [Litv (Word64Lit w)] =>
+      Some (st, Rval (Litv (IntLit (Z.of_nat (word_to_nat _ w)))))
+  | CopyStrStr, [Litv (StrLit str); Litv (IntLit off); Litv (IntLit len)] =>
+      Some (st,
+          match copy_array (string_to_list_char str,off) len None with
+          | None => Rerr (Rraise sub_exn_v)
+          | Some cs => Rval (Litv (StrLit (list_char_to_string cs)))
+          end)
+  | CopyStrAw8, [Litv (StrLit str); Litv (IntLit off); Litv (IntLit len);
+                 Loc dst; Litv (IntLit dstoff)] =>
       match store_lookup dst s with
       | Some (W8array ws) =>
-        match copy_array (string_to_list_char str, off) len
-                         (Some (map word8_to_char ws, dstoff)) with
-        | None => Some ((s,t), Rerr (Rraise sub_exn_v))
-        | Some cs =>
-          match store_assign dst (W8array (map char_to_word8 cs)) s with
-          | Some s' =>  Some ((s',t), Rval (Conv None []))
-          | _ => None
+          match copy_array (string_to_list_char str, off) len
+                  (Some (map word8_to_char ws, dstoff)) with
+          | None => Some (st, Rerr (Rraise sub_exn_v))
+          | Some cs =>
+              match store_assign dst (W8array (map char_to_word8 cs)) s with
+              | Some s' =>  Some ((s',t), Rval (Conv None []))
+              | _ => None
+              end
           end
-        end
       | _ => None
       end
-    | CopyAw8Str, [Loc src; Litv (IntLit off); Litv (IntLit len)] =>
+  | CopyAw8Str, [Loc src; Litv (IntLit off); Litv (IntLit len)] =>
       match store_lookup src s with
       | Some (W8array ws) =>
-        Some ((s,t),
-        match copy_array (ws,off) len None with
-        | None => Rerr (Rraise sub_exn_v)
-        | Some ws => Rval (Litv (StrLit( list_char_to_string
-                                         (map word8_to_char ws))))
-        end)
+          Some ((s,t),
+              match copy_array (ws,off) len None with
+              | None => Rerr (Rraise sub_exn_v)
+              | Some ws => Rval (Litv (StrLit( list_char_to_string
+                                                (map word8_to_char ws))))
+              end)
       | _ => None
       end
-    | CopyAw8Aw8, [Loc src; Litv (IntLit off); Litv (IntLit len);
-                     Loc dst; Litv (IntLit dstoff)] =>
+  | CopyAw8Aw8, [Loc src; Litv (IntLit off); Litv (IntLit len);
+                 Loc dst; Litv (IntLit dstoff)] =>
       match store_lookup src s, store_lookup dst s with
       | Some (W8array ws), Some (W8array ds) =>
-        match copy_array (ws,off) len (Some (ds,dstoff)) with
-        | None => Some ((s,t), Rerr (Rraise sub_exn_v))
-        | Some ws =>
-          match store_assign dst (W8array ws) s with
-          | Some s' => Some ((s',t), Rval (Conv None []))
-          | _ => None
+          match copy_array (ws,off) len (Some (ds,dstoff)) with
+          | None => Some ((s,t), Rerr (Rraise sub_exn_v))
+          | Some ws =>
+              match store_assign dst (W8array ws) s with
+              | Some s' => Some ((s',t), Rval (Conv None []))
+              | _ => None
+              end
           end
-        end
       | _, _ => None
       end
-    | Ord, [Litv (CharLit c)] =>
-      Some ((s,t), Rval (Litv (IntLit (Z.of_nat (nat_of_ascii c)))))
-    | Chr, [Litv (IntLit i)] =>
-      Some ((s,t), if andb (i <? 0)%Z (255 <? i)%Z
-                   then Rerr (Rraise chr_exn_v)
-                   else Rval (Litv (CharLit (ascii_of_nat (Z.to_nat i)))))
-    | Chopb op, [Litv (CharLit c1); Litv (CharLit c2)] =>
-      Some ((s,t), Rval (Boolv (opb_lookup op (Z.of_nat (nat_of_ascii c1))
-                                           (Z.of_nat (nat_of_ascii c2)))))
-    | Implode, [v] =>
+  | Ord, [Litv (CharLit c)] =>
+      Some (st, Rval (Litv (IntLit (Z.of_nat (nat_of_ascii c)))))
+  | Chr, [Litv (IntLit i)] =>
+      Some (st, if andb (i <? 0)%Z (255 <? i)%Z
+                then Rerr (Rraise chr_exn_v)
+                else Rval (Litv (CharLit (ascii_of_nat (Z.to_nat i)))))
+  | Chopb op, [Litv (CharLit c1); Litv (CharLit c2)] =>
+      Some (st, Rval (Boolv (opb_lookup op (Z.of_nat (nat_of_ascii c1))
+                               (Z.of_nat (nat_of_ascii c2)))))
+  | Implode, [v] =>
       match val_to_char_list v with
-      | Some ls => Some ((s,t), Rval (Litv (StrLit (list_char_to_string ls))))
+      | Some ls => Some (st, Rval (Litv (StrLit (list_char_to_string ls))))
       | None => None
       end
-    | Strsub, [Litv (StrLit str); Litv (IntLit i)] =>
-      if (Z_lt_dec i 0)%Z then
-        Some ((s,t), Rerr (Rraise sub_exn_v))
-      else
-        let n := Z.to_nat i in
-        match String.get n str with
-        | Some n' => Some ((s,t), Rval (Litv (CharLit n')))
-        | None    => Some ((s,t), Rerr (Rraise sub_exn_v))
-        end
-    | Strlen, [Litv (StrLit str)] =>
-      Some ((s,t), Rval (Litv (IntLit (Z.of_nat (String.length str)))))
-    | Strcat, [v] =>
-      match val_to_list v with
-      | Some vs =>
-        match vals_to_string vs with
-        | Some str =>
-          Some ((s,t), Rval (Litv(StrLit str)))
-        | _ => None
-        end
+  | Explode, [v] =>
+      match v with
+      | Litv (StrLit str) =>
+          Some (st, Rval (list_to_val (map (fun c => Litv (CharLit c)) (string_to_list_char str))))
       | _ => None
       end
-    | VfromList, [v] =>
+  | Strsub, [Litv (StrLit str); Litv (IntLit i)] =>
+      if (i <? 0)%Z then
+        Some (st, Rerr (Rraise sub_exn_v))
+      else
+        let n := Z.abs_nat i in
+        match String.get n str with
+        | Some n' => Some (st, Rval (Litv (CharLit n')))
+        | None    => Some (st, Rerr (Rraise sub_exn_v))
+        end
+  | Strlen, [Litv (StrLit str)] =>
+      Some (st, Rval (Litv (IntLit (Z.of_nat (String.length str)))))
+  | Strcat, [v] =>
       match val_to_list v with
-      | Some vs => Some ((s,t), Rval (Vectorv vs))
+      | Some vs =>
+          match vals_to_string vs with
+          | Some str =>
+              Some (st, Rval (Litv(StrLit str)))
+          | _ => None
+          end
+      | _ => None
+      end
+  | VfromList, [v] =>
+      match val_to_list v with
+      | Some vs => Some (st, Rval (Vectorv vs))
       | None    => None
       end
-    | Vsub, [Vectorv vs; Litv (IntLit i)] =>
-      if (Z_lt_dec i 0)%Z
-      then Some ((s,t), Rerr (Rraise sub_exn_v))
+  | Vsub, [Vectorv vs; Litv (IntLit i)] =>
+      if (i <? 0)%Z
+      then Some (st, Rerr (Rraise sub_exn_v))
       else
-        let n := Z.to_nat i in
+        let n := Z.abs_nat i in
         match nth_error vs n with
-        | None    => Some ((s,t), Rerr (Rraise sub_exn_v))
-        | Some v' => Some ((s,t), Rval v')
+        | None    => Some (st, Rerr (Rraise sub_exn_v))
+        | Some v' => Some (st, Rval v')
         end
-    | Vlength, [Vectorv vs] =>
+  | Vlength, [Vectorv vs] =>
       Some ((s,t), Rval (Litv (IntLit (Z.of_nat (List.length  vs)))))
-    | Aalloc, [Litv (IntLit n); v] =>
-      if (Z_lt_dec n 0)%Z
-      then Some ((s,t), Rerr (Rraise sub_exn_v))
+  | Aalloc, [Litv (IntLit n); v] =>
+      if (n <? 0)%Z
+      then Some (st, Rerr (Rraise sub_exn_v))
       else
         let (s',lnum) := store_alloc (Varray (List.repeat v (Z.to_nat n))) s
         in Some ((s',t), Rval (Loc lnum))
-    | AallocEmpty, [Conv None []] =>
+  | AallocEmpty, [Conv None []] =>
       let (s',lnum) := store_alloc (Varray []) s
       in Some ((s',t), Rval (Loc lnum))
-    | Asub, [Loc lnum; Litv (IntLit i)] =>
+  (* | AallocFixed, vs => *)
+  (*     let '(s', lnum) := store_alloc (Varray []) s *)
+  (*     in Some ((s',t), Rval (Loc lnum)) *)
+  | Asub, [Loc lnum; Litv (IntLit i)] =>
       match store_lookup lnum s with
       | Some (Varray vs) =>
-        if (Z_lt_dec i 0)%Z then
-          Some ((s,t), Rerr (Rraise sub_exn_v))
-        else
-          let n := Z.to_nat i in
-          match nth_error vs n with
-          | None    => Some ((s,t), Rerr (Rraise sub_exn_v))
-          | Some v' => Some ((s,t), Rval v')
-          end
-      | _ => None
-      end
-    | Alength, [Loc n] =>
-      match store_lookup n s with
-      | Some (Varray ws) =>
-        Some ((s,t), Rval (Litv (IntLit (Z.of_nat (List.length ws)))))
-      | _ => None
-      end
-    | Aupdate, [Loc lnum; Litv (IntLit i); v] =>
-      match store_lookup lnum s with
-      | Some (Varray vs') =>
-        if (Z_lt_dec i 0)%Z then (* LATER: use a wrapper function for this kind of test *)
-          Some ((s,t), Rerr (Rraise sub_exn_v))
-        else
-          let n := Z.to_nat i in
-          if Nat.leb (List.length vs') n
+          if (i <? 0)%Z
           then Some ((s,t), Rerr (Rraise sub_exn_v))
           else
-            match store_assign lnum (Varray (update n v vs')) s with
-            | None => None
-            | Some s' => Some ((s',t), Rval (Conv None []))
+            let n := Z.to_nat i in
+            match nth_error vs n with
+            | None    => Some (st, Rerr (Rraise sub_exn_v))
+            | Some v' => Some (st, Rval v')
             end
       | _ => None
       end
-    | ConfigGC, [Litv (IntLit i); Litv (IntLit j)] =>
-      Some ((s,t), Rval (Conv None []))
-    | FFI n, [Litv(StrLit conf); Loc lnum] =>
+  | Asub_unsafe, [Loc lnum; Litv (IntLit i)] =>
       match store_lookup lnum s with
-      | Some (W8array ws) =>
-        match call_FFI t n (List.map (fun c' => nat_to_word 8 (nat_of_ascii c'))
-                                     (string_to_list_char conf)) ws with
-        | Ffi_return _ t' ws' =>
-          match store_assign lnum (W8array ws') s with
-          | Some s' => Some ((s', t'), Rval (Conv None []))
-          | None => None
-          end
-        | Ffi_final _ outcome =>
-          Some ((s, t), Rerr (Rabort (Rffi_error outcome)))
-        end
+      | Some (Varray vs) =>
+          if (i <? 0)%Z
+          then None
+          else
+            let n := Z.abs_nat i in
+            match nth_error vs n with
+            | None    => None
+            | Some v' => Some ((s,t), Rval v')
+            end
       | _ => None
       end
-    | _,_ => None
-    end
+  | Alength, [Loc n] =>
+      match store_lookup n s with
+      | Some (Varray ws) =>
+          Some (st, Rval (Litv (IntLit (Zlength ws))))
+      | _ => None
+      end
+  | Aupdate, [Loc lnum; Litv (IntLit i); v] =>
+      match store_lookup lnum s with
+      | Some (Varray vs') =>
+          if (i =? 0)%Z then (* LATER: use a wrapper function for this kind of test *)
+            Some ((s,t), Rerr (Rraise sub_exn_v))
+          else
+            let n := Z.abs_nat i in
+            if (length vs') <? n
+            then Some (st, Rerr (Rraise sub_exn_v))
+            else
+              match store_assign lnum (Varray (update n v vs')) s with
+              | None => None
+              | Some s' => Some ((s',t), Rval (Conv None []))
+              end
+      | _ => None
+      end
+  | Aupdate_unsafe, [Loc lnum; Litv (IntLit i); v] =>
+      match store_lookup lnum s with
+      | Some (Varray vs') =>
+          if (i =? 0)%Z then (* LATER: use a wrapper function for this kind of test *) (* QUESTION: Why ? *)
+            None
+          else
+            let n := Z.abs_nat i in
+            if (length vs') <? n
+            then None
+            else
+              match store_assign lnum (Varray (update n v vs')) s with
+              | None => None
+              | Some s' => Some ((s',t), Rval (Conv None []))
+              end
+      | _ => None
+      end
+  | ConfigGC, [Litv (IntLit i); Litv (IntLit j)] =>
+      Some (st, Rval (Conv None []))
+  | FFI n, [Litv(StrLit conf); Loc lnum] =>
+      match store_lookup lnum s with
+      | Some (W8array ws) =>
+          match call_FFI t n (List.map (fun c' => nat_to_word 8 (nat_of_ascii c'))
+                                (string_to_list_char conf)) ws with
+          | Ffi_return _ t' ws' =>
+              match store_assign lnum (W8array ws') s with
+              | Some s' => Some ((s', t'), Rval (Conv None []))
+              | None => None
+              end
+          | Ffi_final _ outcome =>
+              Some (st, Rerr (Rabort (Rffi_error outcome)))
+          end
+      | _ => None
+      end
+  | _,_ => None
   end.
 
 Inductive exp_or_val : Type :=
@@ -481,7 +515,7 @@ Inductive exp_or_val : Type :=
   | Val : val -> exp_or_val.
 
 Definition do_log (op : lop) (v : val) (e : exp) : option exp_or_val :=
-  match op with (* LATER: would be more idiomatic to write "If v = Boolv true" *)
+  match op with
   | And => if val_beq (Boolv true) v
           then Some (Exp e)
           else if val_beq (Boolv false) v
@@ -537,18 +571,6 @@ where size_vve (vve : list (varN * varN * exp)) : nat :=
 | [] => 0;
 | (_,_,e)::vve' => 1 + size_exp e + size_vve vve'.
 
-(* Fixpoint size_exps (es : list exp) : nat := *)
-(*   match es with *)
-(*   | [] => O *)
-(*   | e::es' => size_exp e + size_exps es' *)
-(*   end. *)
-
-(* Fixpoint size_pes (pes : list (pat * exp)) := *)
-(*   match pes with *)
-(*   | [] => 0 *)
-(*   | (_,e)::pes' => S (size_exp e + size_pes pes') *)
-(*   end. *)
-
 Theorem size_exps_app : forall (es es' : list exp), size_exps (es ++ es') = size_exps es + size_exps es'.
 Proof.
   induction es.
@@ -570,22 +592,14 @@ Inductive fuel_size_rel : nat * list exp -> nat * list exp -> Prop :=
 | fuel_eq : forall (f : nat) (es es' : list exp), size_exps es < size_exps es' -> fuel_size_rel (f, es) (f, es')
 | fuel_less : forall (f f' : nat) (es es' : list exp), f < f' -> fuel_size_rel (f, es) (f', es').
 
-Definition fuel_size_rel_alt (p0 p1 : nat * list exp) : Prop :=
-  let (n0,es0) := p0 in
-  let (n1,es1) := p1 in
-  n0 < n1 \/ n0 = n1 /\ size_exps es0 < size_exps es1.
-
 Inductive fuel_size_pes_rel : nat * list (pat * exp) -> nat * list (pat * exp) -> Prop :=
 | spfuel_eq : forall (f : nat) (pes pes' : list (pat * exp)), size_pes pes < size_pes pes' -> fuel_size_pes_rel (f, pes) (f, pes')
 | spfuel_less : forall (f f' : nat) (pes pes' : list (pat * exp)), f < f' -> fuel_size_pes_rel (f, pes) (f', pes').
 
-Require Import Coq.Init.Wf.
-Require Program.
-
 Definition Rfuel (f f' : nat) := f < f'.
 
-Definition lex_exps (f : nat) := list exp.
-Definition Rsize (f : nat) (es es' : lex_exps f) := size_exps (es) < size_exps es'.
+Definition lex_exps (_ : nat) := list exp.
+Definition Rsize (es es' : list exp) := size_exps (es) < size_exps es'.
 
 Theorem Rfuel_wf : well_founded Rfuel.
 Proof.
@@ -601,8 +615,8 @@ Proof.
     lia.
 Qed.
 
-Lemma Rsize_wf' : forall f len es, size_exps es <= len -> Acc (Rsize f) es.
-  intros f len.
+Lemma Rsize_wf' : forall len es, size_exps es <= len -> Acc (Rsize) es.
+  intros len.
   induction len; intros; constructor; intros.
   - unfold Rsize in *.
     lia.
@@ -611,7 +625,7 @@ Lemma Rsize_wf' : forall f len es, size_exps es <= len -> Acc (Rsize f) es.
     lia.
 Qed.
 
-Theorem Rsize_wf : forall f, well_founded (Rsize f).
+Theorem Rsize_wf : well_founded Rsize.
 Proof.
   red.
   induction a; constructor; intros.
@@ -621,10 +635,8 @@ Proof.
     lia.
 Qed.
 
-Require Import Coq.Wellfounded.Lexicographic_Product.
-Require Import Relation_Operators.
-Definition lex_f_s := lexprod Rfuel Rsize.
-Definition lex_f_s_wf := (wf_lexprod nat lex_exps Rfuel Rsize Rfuel_wf Rsize_wf).
+Definition lex_f_s := lexprod _ _ Rfuel Rsize.
+Definition lex_f_s_wf := (wf_lexprod _ _ Rfuel Rsize Rfuel_wf Rsize_wf).
 
 Lemma size_exp_at_least_S : (forall x, 1 <= size_exp x).
 Proof.
@@ -704,7 +716,6 @@ Defined.
 (*----------------------------------------------------------------------------*)
 (*------------- EQUATIONS VERSION ------------------------------------------- *)
 (*----------------------------------------------------------------------------*)
-Require Import Equations.
 
 
 #[local] Instance FSRWellFounded : WellFounded fuel_size_rel.
@@ -717,7 +728,7 @@ Equations evaluate_match {ffi' : Type} (pes : list (pat * exp)) (fuel : nat) (st
   : state ffi' * result (list val) val := {
   evaluate_match [] _ st _ _ err_v _ => (st, Rerr (Rraise err_v));
   evaluate_match ((p,e)::pes') fuel st env matched_v err_v f =>
-    if NoDuplicates_dec string_dec (pat_bindings p)
+    if NoDuplicates_dec string_dec (pat_bindings p [])
     then (match pmatch (sec env) (refs st) p matched_v [] with
           | Match env_v' =>
             f [e] fuel st
@@ -916,7 +927,7 @@ Equations? eval_or_match (sel : bool) (es : if sel then list exp else list (pat 
   eval_or_match false [] _ st _ _ err_v => (st, Rerr (Rraise err_v));
 
   eval_or_match false ((p,e)::pes') fuel st env matched_v err_v =>
-    if NoDuplicates_dec string_dec (pat_bindings p)
+    if NoDuplicates_dec string_dec (pat_bindings p [])
     then (match pmatch (sec env) (refs st) p matched_v [] with
           | Match env_v' =>
             eval_or_match true [e] fuel st
@@ -1261,7 +1272,7 @@ Equations? evaluate_decs (fuel : nat) (st : state nat) (env : sem_env val) (decl
         end;
 
     evaluate_decs fuel st env [Dlet locs p e] =>
-        if NoDuplicates_dec string_dec (pat_bindings p)
+        if NoDuplicates_dec string_dec (pat_bindings p [])
         then match evaluate [e] fuel st env with
              | (st', Rval v) =>
                (st', match pmatch (sec env) (refs st') p (hd (Conv None []) v) [] with

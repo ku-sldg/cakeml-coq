@@ -1,0 +1,13 @@
+-R _build/default/cakeSemantics CakeSem
+cakeSemantics/Word.v
+cakeSemantics/Utils.v
+cakeSemantics/ffi/FFI.v
+cakeSemantics/ffi/SimpleIO.v
+cakeSemantics/Namespace.v
+cakeSemantics/CakeAST.v
+cakeSemantics/FreeVars.v
+cakeSemantics/SemanticsAux.v
+cakeSemantics/Evaluate.v
+
+-R _build/default/utils StructTact
+utils/StructTactics.v

@@ -1,62 +1,44 @@
-Set Implicit Arguments.
-
-Require Import Arith.
-Require Import Ascii.
-Import Bool.Sumbool.
+Require Import Bool.Sumbool.
 Require Import List.
 Import ListNotations.
-
-(* Require Import Strings.Ascii. *)
 Require Import ZArith.
-Require ZArith.Zdigits.
 
-Require Import CakeSem.ffi.FFI.
 Require Import CakeSem.Utils.
 Require Import CakeSem.CakeAST.
 Require Import CakeSem.Namespace.
-Require Import CakeSem.FreeVars.
+Require Import CakeSem.ffi.FFI.
 
 Open Scope string_scope.
 Open Scope list_scope.
 
-(** LATER: throughout the files, every definition should have all its arguments
-    and its return type explicit. This helps a lot reading the specification. *)
-
+Set Implicit Arguments.
 (* ********************************************************************** *)
 (** * Auxiliary semantics constructs *)
 
 (* ---------------------------------------------------------------------- *)
 (** ** Stamps and predefined constructors *)
 
+(* constructor name and unique type number *)
 Inductive stamp : Type :=
   | TypeStamp : conN -> nat -> stamp
   | ExnStamp : nat -> stamp.
 Scheme Equality for stamp.
 #[export] Hint Resolve stamp_eq_dec : DecidableEquality.
-(* LATER : add type annotations? *)
-
-Definition bind_stamp := ExnStamp 0.
-Definition chr_stamp := ExnStamp 1.
-Definition div_stamp := ExnStamp 2.
-Definition subscript_stamp := ExnStamp 3.
-
-(* BACKPORT: bind_exn_v is used to mean "match failure", but that's not an intuitive name for it *)
 
 (* ---------------------------------------------------------------------- *)
 (** ** Environments *)
-
-(* BACKPORT: use of this abbreviations in the definition of sem_env *)
-Definition env_ctor := namespace modN conN (nat * stamp).
-
 (* QUESTION: what is the interest of being generic in the type of values? *)
+(* ANSWER: I DON'T EVEN KNOW, but also we havent defined our values yet *)
 
 Record sem_env (V : Type) := {
   sev : namespace modN varN V;
-  sec : env_ctor }.
+  (* nat is the arity of the constructor name conN *)
+  sec : namespace modN conN (nat * stamp) }.
 
 Arguments sev {V} _.
 Arguments sec {V} _.
 
+(* TODO: Move to theorems file? *)
 Theorem sem_env_id : forall (V : Type) (env : sem_env V), env = {| sev := sev env; sec := sec env|}.
 Proof. destruct env; reflexivity.  Qed.
 
@@ -77,24 +59,12 @@ Definition extend_dec_env (V : Type) (new_env env : sem_env V) : sem_env V :=
   {| sev := nsAppend (sev new_env) (sev env);
      sec := nsAppend (sec new_env) (sec env)|}.
 
-(* Fixpoint optimize_sem_env {V : Type} (env : sem_env V) (fvs : list (ident modN varN)) : sem_env V := *)
-(*   match fvs with *)
-(*     | [] => {| sec := nsEmpty; sev := nsEmpty |} *)
-(*     | id::fvs' => let opt := optimize_sem_env env fvs' in *)
-(*                 match nsLookup (ident_eq_dec _ _ string_dec string_dec) id (sev env), *)
-(*                       nsLookup (ident_eq_dec _ _ string_dec string_dec) id (sec env) with *)
-(*                 | Some v, Some v' => {| sec := (id, v')::(sec opt); sev := (id,v)::(sev opt) |} *)
-(*                 | Some v, _       => {| sec := sec opt; sev := (id,v)::(sev opt) |} *)
-(*                 | _, Some v'      => {| sec := (id, v')::(sec opt); sev := sev opt |} *)
-(*                 | _, _ => opt *)
-(*                 end *)
-(*   end. *)
-
 (* ---------------------------------------------------------------------- *)
 (** ** Values *)
 
 Unset Elimination Schemes.
 
+(* TODO: HOL4 version now supports floating point and a repl *)
 Inductive val : Type :=
   | Litv : lit -> val
   | Conv : option stamp -> list val -> val
@@ -105,28 +75,40 @@ Inductive val : Type :=
 
 Set Elimination Schemes.
 Definition env_val := namespace modN varN val.
+Definition env_ctor := namespace modN conN (nat * stamp).
 
 (** [is_closure v] captures whether [v] is a closure or a recursive closure. *)
+Definition is_closureb (v : val) : bool :=
+  match v with
+  | Closure _ _ _ => true
+  | Recclosure _ _ _ => true
+  | _ => false
+  end.
 
-Definition is_closure (v:val) : Prop :=
+Definition is_closure (v : val) : Prop :=
   match v with
   | Closure _ _ _ => True
   | Recclosure _ _ _ => True
   | _ => False
   end.
 
-
-
 (* ---------------------------------------------------------------------- *)
 (** ** Predefined exceptions and constructors  *)
+(* BACKPORT: bind_stamp is used to mean "match failure", but that's not an intuitive name for it *)
+Definition bind_stamp := ExnStamp 0.
+Definition chr_stamp := ExnStamp 1.
+Definition div_stamp := ExnStamp 2.
+Definition subscript_stamp := ExnStamp 3.
+
 
 Definition bind_exn_v := Conv (Some bind_stamp) [].
 Definition chr_exn_v  := Conv (Some chr_stamp) [].
 Definition div_exn_v  := Conv (Some div_stamp) [].
 Definition sub_exn_v  := Conv (Some subscript_stamp) [].
 
-Definition bool_type_num := 0%nat.
-Definition list_type_num := 1%nat.
+Definition bool_type_num := 0.
+Definition list_type_num := 1.
+Definition option_type_num := 2.
 
 (* BACKPORT: define these 3 shorthands *)
 
@@ -136,9 +118,6 @@ Definition ConvUnit := Conv None [].
 
 Definition Boolv (b : bool) : val :=
   if b then ConvTrue  else ConvFalse.
-
-(* Definition Propv (P:Prop) : val := *)
-(*   Boolv (isTrue P). *)
 
 (* ---------------------------------------------------------------------- *)
 (** ** Result of an evaluation *)
@@ -163,7 +142,6 @@ Inductive result (A : Type) (B : Type) : Type :=
 
 Arguments Rval {A} {B}.
 Arguments Rerr {A} {B}.
-
 
 Definition combine_dec_result {A : Type} (env : sem_env val) (r : result (sem_env val) A) :
   result (sem_env val) A :=
@@ -191,7 +169,6 @@ Arguments Varray {A}.
 
 Definition store (A : Type) :=
   list (store_v A).
-
 
 (* ---------------------------------------------------------------------- *)
 (** ** State *)
@@ -234,7 +211,6 @@ Definition state_update_next_exn_stamp A (st:state A) x :=
       ffi := ffi st;
       next_type_stamp := next_type_stamp st ;
       next_exn_stamp := x |}.
-
 
 (* ---------------------------------------------------------------------- *)
 (** ** Pattern-maching result *)
@@ -284,27 +260,6 @@ Definition stamp_same_type (s1 s2 : stamp) : bool :=
   | ExnStamp _, ExnStamp _ => true
   | _, _ => false
   end.
-(* Inductive stamp_same_type : stamp -> stamp -> Prop := *)
-(* | TypeStampSame : forall n nm1 nm2, stamp_same_type (TypeStamp nm1 n) (TypeStamp nm2 n) *)
-(* | ExnStampSame : forall n m, stamp_same_type (ExnStamp n) (ExnStamp m). *)
-
-(* Theorem stamp_same_type_dec : forall s1 s2, {stamp_same_type s1 s2} + {not (stamp_same_type s1 s2)}. *)
-(* Proof. *)
-(*   induction s1; destruct s2. *)
-(*   - destruct (Nat.eq_dec n n0); subst. *)
-(*     + left. constructor. *)
-(*     + right. intros contra. inv contra. congruence. *)
-(*   - right. intros contra. inv contra. *)
-(*   - right. intros contra. inv contra. *)
-(*   - left. constructor. *)
-(* Defined. *)
-
-(* Definition stamp_same_type (s1 s2 : stamp) : bool := *)
-(*   match s1, s2 with *)
-(*   | TypeStamp _ n1, TypeStamp _ n2 => if Peano_dec.eq_nat_dec n1 n2 then true else false *)
-(*   | ExnStamp _, ExnStamp _ => true *)
-(*   | _, _ => false *)
-(*   end. *)
 
 Definition ctor_same_type (os1 os2 : option stamp) : bool :=
   match os1, os2 with
@@ -313,37 +268,10 @@ Definition ctor_same_type (os1 os2 : option stamp) : bool :=
   | _, _ => false
 end.
 
-(* Inductive ctor_same_type : option stamp -> option stamp -> Prop := *)
-(* | CtorNoneSame : ctor_same_type None None *)
-(* | CtorSomeSame : forall s1 s2, stamp_same_type s1 s2 -> *)
-(*                           ctor_same_type (Some s1) (Some s2). *)
-
-(* Theorem ctor_same_type_dec : forall o1 o2, {ctor_same_type o1 o2} + {not (ctor_same_type o1 o2)}. *)
-(* Proof. *)
-(*   intros. destruct o1; destruct o2; try (destruct s; destruct s0). *)
-(*   - destruct (Nat.eq_dec n n0). *)
-(*     + subst. left. constructor. constructor. *)
-(*     + subst. right. intro contra. inv contra. *)
-(*       inv H1. congruence. *)
-(*   - right. intro contra. inv contra. inv H1. *)
-(*   - right. intro contra. inv contra. inv H1. *)
-(*   - left. constructor. constructor. *)
-(*   - right. intro contra. inv contra. *)
-(*   - right. intro contra. inv contra. *)
-(*   - left. constructor. *)
-(* Defined. *)
-
-(* Definition ctor_same_type (c1 c2 : option stamp) : bool := *)
-(*   match c1, c2 with *)
-(*     | None, None => true *)
-(*     | Some stamp1, Some stamp2 => stamp_same_type stamp1 stamp2 *)
-(*     | _, _ => false *)
-(* end. *)
-
 (** [con_check cenv o l] asserts that the constructor (or None for a tuple) admits arity [l].
     (Note that tuples admit any arity.)
     This is an inductive version of [do_con_check] *)
-Definition con_check (cenv : env_ctor) (cid : constr_id) (l : nat) : bool :=
+Definition do_con_check (cenv : env_ctor) (cid : constr_id) (l : nat) : bool :=
   match cid with
   | None => true
   | Some id => match nsLookup (ident_beq _ _ String.eqb String.eqb) id cenv with
@@ -356,6 +284,7 @@ Definition con_check (cenv : env_ctor) (cid : constr_id) (l : nat) : bool :=
 (** ** Operations on the store *)
 
 Definition empty_store (A : Type) : store A := [].
+Arguments empty_store {A}.
 
 Definition store_lookup {A : Type} (n : nat) (st : store A) :=
   List.nth_error st n.
@@ -366,11 +295,10 @@ Definition store_alloc {A : Type} (v : store_v A) (st : store A) : (store A * na
 Definition store_assign_nocheck {A : Type} (n : nat) (v : store_v A) (st : store A) : store A :=
   Utils.update n v st.
 
-
 (* ---------------------------------------------------------------------- *)
 (** ** Operations on constructors *)
 
-Fixpoint build_conv (cenv : env_ctor) (cid : constr_id) (vs: list val) : option val :=
+Definition build_conv (cenv : env_ctor) (cid : constr_id) (vs: list val) : option val :=
   match cid with
   | None => Some (Conv None vs)
   | Some id => match nsLookup (ident_beq _ _ String.eqb String.eqb) id cenv with
@@ -510,46 +438,45 @@ Fixpoint val_to_char_list (v : val) : option (list char) :=
   | Conv (Some stamp) [] => if stamp_eq_dec stamp (TypeStamp "[]" list_type_num)
                            then Some []
                            else None
-  (* | Conv (Some stamp) [Litv (CharLit c); v'] => *)
-  (*   if stamp_eq_dec stamp (TypeStamp "::" list_type_num) *)
-  (*   then match val_to_char_list v' with *)
-  (*        | Some cs => Some (c::cs) *)
-  (*        | None => None *)
-  (*        end *)
-  (*   else None *)
+  | Conv (Some stamp) [Litv (CharLit c); v'] =>
+    if stamp_eq_dec stamp (TypeStamp "::" list_type_num)
+    then match val_to_char_list v' with
+         | Some cs => Some (c::cs)
+         | None => None
+         end
+    else None
   | _ => None
   end.
 
 Fixpoint vals_to_string (vs : list val) : option String.string :=
   match vs with
   | [] => Some ""
-  (* | (Litv (StrLit s1))::vs' => match vals_to_string vs' with *)
-  (*                            | Some s2 => Some (String.append s1 s2) *)
-  (*                            | None => None *)
-  (*                            end *)
+  | (Litv (StrLit s1))::vs' => match vals_to_string vs' with
+                             | Some s2 => Some (String.append s1 s2)
+                             | None => None
+                             end
   | _ => None
   end.
 
 Open Scope bool_scope.
 Open Scope Z_scope.
 
-Fixpoint copy_array {A : Type} (p : list A * Z) (len : Z)
-         (op : option (list A * Z)) : option (list A) :=
-  let '(src,srcoff) := p in
-  if sumbool_or _ _ _ _ (Z_lt_dec srcoff 0) (sumbool_or _ _ _ _ (Z_lt_dec len 0) (Z_lt_dec (Zlength src) (srcoff + len)))
-    then None
-     else let copied := List.firstn (Z.to_nat len)
-                         (List.skipn (Z.to_nat srcoff) src) in
-           match op with
-           | Some (dst,dstoff) =>
-             if sumbool_or _ _ _ _ (Z_lt_dec dstoff 0)  (Z_lt_dec (Zlength dst) (dstoff + len))
-               then None
-               else Some (List.firstn
-                            (Z.to_nat dstoff)
-                            dst ++ copied ++
-                            List.skipn (Z.to_nat (dstoff + len)) dst)
-           | None => Some copied
-   end.
+Definition copy_array {A : Type} (p : list A * Z) (len : Z)
+                      (op : option (list A * Z)) : option (list A) :=
+  let (src,srcoff) := p in
+  if (srcoff =? 0) || (len <? 0) || (Zlength src <? srcoff + len)
+  then None
+  else let copied := List.firstn (Z.to_nat len)
+                       (List.skipn (Z.to_nat srcoff) src) in
+       match op with
+       | Some (dst,dstoff) => if (dstoff <? 0) || (Zlength dst <? dstoff + len)
+                             then None
+                             else Some (List.firstn
+                                          (Z.to_nat dstoff)
+                                          dst ++ copied ++
+                                          List.skipn (Z.to_nat (dstoff + len)) dst)
+       | None => Some copied
+       end.
 
 Close Scope bool_scope.
 Close Scope Z_scope.

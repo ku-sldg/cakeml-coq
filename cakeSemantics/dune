@@ -1,0 +1,8 @@
+(coq.theory
+ (name CakeSem)
+ (package cakeml-semantics)
+ (modules Word Utils ffi.FFI ffi.SimpleIO Namespace CakeAST SemanticsAux Evaluate)
+  (libraries coq-core.plugins.extraction)
+ (theories StructTact))
+
+(include_subdirs qualified)
