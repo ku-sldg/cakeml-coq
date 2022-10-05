@@ -9,7 +9,7 @@
 (package
  (name cakeml-semantics)
  (depends
-  (coq-equations (= 1.3+8.15))
+  (coq-equations (>= 1.3+8.15))
   (coq (>= 8.15.1)))
  (synopsis "CakeML semantic definitions")
  (description  "")
