@@ -39,15 +39,11 @@ Inductive shift : Type :=
   | Ror : shift.
 Scheme Equality for shift.
 
-Definition modN := string.
-
-Definition varN := string.
-
-Definition conN := string.
-
-Definition typeN := string.
-
-Definition tvarN := string.
+Notation modN := string.
+Notation varN := string.
+Notation conN := string.
+Notation typeN := string.
+Notation tvarN := string.
 
 Inductive word_size : Type :=
   | W8 : word_size
