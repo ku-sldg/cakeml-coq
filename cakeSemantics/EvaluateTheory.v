@@ -1,6 +1,7 @@
 Require Import Lists.List.
 Import ListNotations.
 
+Require Import CakeSem.Utils.
 Require Import CakeSem.Namespace.
 Require Import CakeSem.CakeAST.
 Require Import CakeSem.SemanticsAux.
@@ -377,4 +378,243 @@ Proof.
   induction H.
   assumption.
   apply eval_or_match_inc_fuel_res; assumption.
+Qed.
+
+Lemma eval_or_match_ECon_exists_Conv : forall name es f st st' env v, eval_or_match true [ECon name es] f st env uu uu = (st', Rval [v]) ->
+                            exists stmp vs, v = Conv stmp vs.
+Proof.
+  intros name es f st st' env v H.
+  funelim (eval_or_match true [ECon name es] f st env uu uu); try solve_by_inversion.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - inv H0. clear H0 Hind.
+    simp eval_or_match in H.
+    rewrite Heq1 in H; simpl in H.
+    rewrite Heq0 in H; simpl in H.
+    rewrite Heq in H; simpl in H.
+    unfold build_conv in Heq.
+    break_match; [break_match; [ break_match | ] | ]; do 2 eexists.
+    inv Heq.
+    inv H.
+    reflexivity.
+    inv Heq.
+    inv Heq.
+    inv H.
+    reflexivity.
+  - rewrite H in Heqcall. inv Heqcall.
+
+  Unshelve.
+  repeat constructor.
+  repeat constructor.
+Qed.
+
+Theorem eval_or_match_app :
+  forall (st : state nat) (env : sem_env val) (e : exp) (es : list exp) (f : nat),
+    eval_or_match true (es ++ [e]) f st env uu uu =
+      (let (st', r) := eval_or_match true es f st env uu uu in
+       match r with
+       | Rval vs =>
+           let (st'', r0) := eval_or_match true [e] f st' env uu uu in
+           match r0 with
+           | Rval vs' => (st'', Rval (vs ++ vs'))
+           | Rerr e0 => (st'', Rerr e0)
+           end
+       | Rerr e0 => (st', Rerr e0)
+       end).
+Proof.
+  intros st env e es f.
+  generalize dependent st.
+  induction es; simpl; intro st.
+  - simp eval_or_match.
+    break_match.
+    destruct r.
+    reflexivity.
+    reflexivity.
+  - rewrite eval_or_match_cons.
+    break_match.
+    simp eval_or_match.
+    break_match.
+    rewrite eval_or_match_cons.
+    rewrite Heqp.
+    rewrite IHes.
+    destruct (eval_or_match true es f s env uu uu); simpl.
+    destruct r0.
+    destruct (eval_or_match true [e] f s0 env uu uu).
+    destruct r0.
+    rewrite app_assoc.
+    reflexivity.
+    reflexivity.
+    reflexivity.
+    rewrite eval_or_match_cons.
+    rewrite Heqp.
+    reflexivity.
+Qed.
+
+Lemma eval_or_match_false_cons : forall p e pes' f st env matched_v err_v,
+    eval_or_match false ((p, e) :: pes') f st env matched_v err_v =
+      if NoDuplicates_dec string_dec (pat_bindings p [])
+      then (match pmatch (sec env) (refs st) p matched_v [] with
+            | Match env_v' =>
+                eval_or_match true [e] f st
+                              {| sev := nsAppend (alist_to_ns env_v') (sev env);
+                                sec := (sec env) |} uu uu
+            | No_match => eval_or_match false pes' f st env matched_v err_v
+            | Match_type_error => (st, Rerr (Rabort Rtype_error))
+            end)
+      else (st, Rerr (Rabort Rtype_error)).
+Proof.
+  intros.
+  simp eval_or_match.
+  reflexivity.
+Qed.
+
+Equations length_helper (sel : bool) (es : if sel then list exp else list (pat * exp)) (vs : list val) : Prop := {
+    length_helper true es vs  := length vs = length es;
+    length_helper false es vs := length vs = 1;
+  }.
+
+Lemma eval_or_match_sel_length : forall sel es (f : nat) (st st' : state ST) (env : sem_env val) (vs : list val) match_v err_v,
+    eval_or_match sel es f st env match_v err_v = (st', Rval vs) ->
+    length_helper sel es vs.
+Proof.
+  intros.
+  funelim (eval_or_match sel es f st env match_v err_v).
+  - simp length_helper. simp eval_or_match in H. inv H. reflexivity.
+  - simp length_helper. simp eval_or_match in H. inv H. reflexivity.
+  - simp length_helper. simp eval_or_match in H. inv H. reflexivity.
+  - simp length_helper. simp eval_or_match in H. inv H.
+  - simp length_helper. simp eval_or_match in H0.
+    break_match.
+    apply H in H0.
+    simp length_helper in H0.
+    assumption.
+    inv H0.
+  - simp length_helper. rewrite H0 in Heqcall.
+    apply H in Heqcall.
+    simp length_helper in Heqcall.
+  - simp length_helper. rewrite H0 in Heqcall.
+    apply H in Heqcall.
+    simp length_helper in Heqcall.
+  - simp length_helper. rewrite H in Heqcall.
+    inv Heqcall.
+  - break_match.
+    + break_match.
+      -- simp eval_or_match in *.
+         break_match.
+         ++ break_match.
+            ** apply H in H1.
+               simp length_helper in *.
+               assumption.
+            ** inv Heqm.
+            ** rewrite H1 in Heqcall.
+               apply H in Heqcall.
+               simp length_helper in *.
+               assumption.
+         ++ inv H1.
+      -- rewrite H1 in Heqcall.
+         inv Heqcall.
+      -- rewrite H1 in Heqcall.
+         eapply H0 in Heqcall.
+         simp length_helper in *.
+         assumption.
+         reflexivity.
+         reflexivity.
+    + rewrite H1 in Heqcall. inv Heqcall.
+  - apply Hind in Heq.
+    simp length_helper in *.
+    inv Heq.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - apply Hind in Heq. rewrite H in Heqcall. inv Heqcall.
+    simp length_helper in *.
+  - rewrite H0 in Heqcall.
+    apply H in Heqcall.
+    simp length_helper in *.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall. simp length_helper. reflexivity.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall. simp length_helper. reflexivity.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H0 in Heqcall. apply H in Heqcall. simp length_helper in *.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+    unfold list_result in H2.
+    break_match; try inv H2.
+    simp length_helper. reflexivity.
+  - rewrite H in Heqcall. inv Heqcall.
+  - apply Hind in Heq. simp length_helper in Heq. inv Heq.
+  - rewrite H0 in Heqcall.
+    break_match.
+    apply H in Heqcall.
+    simp length_helper in *.
+    break_match.
+    inv Heqcall.
+    simp length_helper; reflexivity.
+    inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - apply Hind in Heq. simp length_helper in Heq. inv Heq.
+  - break_match.
+    rewrite H0 in Heqcall. inv Heqcall. simp length_helper; reflexivity.
+    break_match.
+    rewrite H0 in Heqcall.
+    apply H in Heqcall.
+    simp length_helper in *.
+    rewrite H0 in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H1 in Heqcall. break_match.
+    apply H in Heqcall.
+    simp length_helper in *.
+    break_match.
+    apply H0 in Heqcall.
+    simp length_helper in *.
+    inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - apply Hind in Heq. simp length_helper in Heq. inv Heq.
+  - rewrite H0 in Heqcall. apply H in Heqcall. simp length_helper in *.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H0 in Heqcall. apply H in Heqcall.
+    simp length_helper in *.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+  - rewrite H in Heqcall. inv Heqcall.
+    apply Hind0 in Heq0.
+    simp length_helper in Heq0. inv Heq0.
+  - rewrite H in Heqcall. inv Heqcall.
+    apply Hind in Heq. simp length_helper in *.
+    simpl. rewrite Heq. reflexivity.
+Qed.
+
+Theorem eval_or_match_false_length : forall (es : list (pat * exp)) (f : nat) (st st' : state ST) (env : sem_env val) (vs : list val) match_v err_v,
+    eval_or_match false es f st env match_v err_v = (st', Rval vs) -> length vs = 1.
+Proof.
+  intros.
+  apply eval_or_match_sel_length in H.
+  simp length_helper in H.
+Qed.
+
+Theorem eval_or_match_true_length : forall (es : list exp) (f : nat) (st st' : state ST) (env : sem_env val) (vs : list val),
+    eval_or_match true es f st env uu uu = (st', Rval vs) -> length vs = length es.
+Proof.
+  intros.
+  apply eval_or_match_sel_length in H.
+  simp length_helper in H.
+Qed.
+
+Theorem eval_or_match_sing : forall (e : exp) (f : nat) (st st' : state ST) (env : sem_env val) (vs : list val),
+    eval_or_match true [e] f st env uu uu = (st', Rval vs) -> exists v, vs = [v].
+Proof.
+  intros.
+  apply eval_or_match_sel_length in H.
+  simp length_helper in H.
+  destruct vs; inv H.
+  destruct vs; inv H.
+  exists v. reflexivity.
 Qed.
