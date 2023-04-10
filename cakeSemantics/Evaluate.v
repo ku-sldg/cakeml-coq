@@ -1236,7 +1236,7 @@ Equations? evaluate_decs (fuel : nat) (st : state nat) (env : sem_env val) (decl
 
     evaluate_decs fuel st env [Dlet locs p e] =>
         if NoDuplicates_dec string_dec (pat_bindings p [])
-        then match evaluate [e] fuel st env with
+        then match eval_or_match true [e] fuel st env with
              | (st', Rval v) =>
                (st', match pmatch (sec env) (refs st') p (hd (Conv None []) v) [] with
                      | Match new_vals => Rval {| sec := nsEmpty; sev := alist_to_ns new_vals |}

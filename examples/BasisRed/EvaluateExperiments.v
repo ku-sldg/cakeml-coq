@@ -917,7 +917,7 @@ Qed.
 (*   unfold extend_dec_env; simpl. *)
 
 (*   eapply evaluate_decs_cons'. *)
-(*   unfold dec_def_27_2_2_11. *)
+   unfold dec_def_27_2_2_11. *)
 (*   simp evaluate_decs; simpl. *)
 (*   reflexivity. *)
 (*   unfold extend_dec_env. *)

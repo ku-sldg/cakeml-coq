@@ -1,3 +1,4 @@
+Require Import Lia.
 Require Import Lists.List.
 Import ListNotations.
 
@@ -617,4 +618,67 @@ Proof.
   destruct vs; inv H.
   destruct vs; inv H.
   exists v. reflexivity.
+Qed.
+
+Theorem evaluate_decs_inc_fuel : forall (f : nat) (st st' : state ST) (env env' : sem_env val)
+                                     (ds : list dec),
+    evaluate_decs f st env ds = (st', Rval env') -> evaluate_decs (S f) st env ds = (st', Rval env').
+Proof.
+  intros.
+  funelim (evaluate_decs f st env ds); simp evaluate_decs in *.
+  - break_match.
+    + remember (evaluate [e] fuel st env). destruct p0. destruct r.
+      symmetry in Heqp0.
+      apply (more_fuel_same_value fuel (S fuel)) in Heqp0; try lia.
+      rewrite Heqp0.
+      assumption.
+      inv Heqp0.
+      inv H.
+    + inv H.
+  - remember (evaluate_decs fuel st env ds). destruct p. rewrite Heqp in H. destruct r.
+    symmetry in Heqp. apply H in Heqp.
+    rewrite Heqp.
+    assumption.
+    inv H0.
+  - remember (evaluate_decs fuel st env ds1). destruct p. rewrite Heqp in H. destruct r.
+    symmetry in Heqp. apply H in Heqp.
+    rewrite Heqp.
+    eapply H0; try constructor.
+    constructor.
+    constructor.
+    constructor.
+    assumption.
+    inv H1.
+  - clear Heqcall.
+    remember (evaluate_decs fuel st env [d1]). destruct p. rewrite Heqp in H. destruct r.
+    symmetry in Heqp. apply H in Heqp.
+    rewrite Heqp.
+    remember (evaluate_decs fuel s (extend_dec_env s0 env) (d2 :: decl')). destruct p.
+    destruct r.
+
+    assert (copyHeqp0 : (s1, Rval s2) = evaluate_decs fuel s (extend_dec_env s0 env) (d2 :: decl')) by assumption.
+    rewrite Heqp0 in Heqp0.
+    eapply H0 in Heqp0.
+    rewrite Heqp0.
+    inv H1.
+    apply H1.
+    constructor.
+    constructor.
+    constructor.
+    constructor.
+    symmetry. assumption.
+    reflexivity.
+    inv H1.
+    inv H1.
+Qed.
+
+Theorem evaluate_decs_more_fuel_same_value : forall (f f' : nat) (st st' : state ST) (env env' : sem_env val)
+                                     (ds : list dec),
+   f <= f' -> evaluate_decs f st env ds = (st', Rval env') -> evaluate_decs f' st env ds = (st', Rval env').
+Proof.
+  intros.
+  induction H.
+  assumption.
+  apply evaluate_decs_inc_fuel.
+  assumption.
 Qed.
