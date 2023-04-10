@@ -627,9 +627,11 @@ Proof.
   intros.
   funelim (evaluate_decs f st env ds); simp evaluate_decs in *.
   - break_match.
-    + remember (evaluate [e] fuel st env). destruct p0. destruct r.
+    + remember (eval_or_match true [e] fuel st env uu uu). 
+      destruct p0. destruct r.
       symmetry in Heqp0.
       apply (more_fuel_same_value fuel (S fuel)) in Heqp0; try lia.
+      unfold evaluate in Heqp0.
       rewrite Heqp0.
       assumption.
       inv Heqp0.
