@@ -453,7 +453,7 @@ Qed.
 
 Lemma eval_or_match_false_cons : forall p e pes' f st env matched_v err_v,
     eval_or_match false ((p, e) :: pes') f st env matched_v err_v =
-      if NoDuplicates_dec string_dec (pat_bindings p [])
+      if nodup_str (pat_bindings p [])
       then (match pmatch (sec env) (refs st) p matched_v [] with
             | Match env_v' =>
                 eval_or_match true [e] f st
@@ -488,7 +488,6 @@ Proof.
     break_match.
     apply H in H0.
     simp length_helper in H0.
-    assumption.
     inv H0.
   - simp length_helper. rewrite H0 in Heqcall.
     apply H in Heqcall.
@@ -505,19 +504,16 @@ Proof.
          ++ break_match.
             ** apply H in H1.
                simp length_helper in *.
-               assumption.
             ** inv Heqm.
             ** rewrite H1 in Heqcall.
                apply H in Heqcall.
                simp length_helper in *.
-               assumption.
          ++ inv H1.
       -- rewrite H1 in Heqcall.
          inv Heqcall.
       -- rewrite H1 in Heqcall.
          eapply H0 in Heqcall.
          simp length_helper in *.
-         assumption.
          reflexivity.
          reflexivity.
     + rewrite H1 in Heqcall. inv Heqcall.
@@ -627,7 +623,7 @@ Proof.
   intros.
   funelim (evaluate_decs f st env ds); simp evaluate_decs in *.
   - break_match.
-    + remember (eval_or_match true [e] fuel st env uu uu). 
+    + remember (eval_or_match true [e] fuel st env uu uu).
       destruct p0. destruct r.
       symmetry in Heqp0.
       apply (more_fuel_same_value fuel (S fuel)) in Heqp0; try lia.

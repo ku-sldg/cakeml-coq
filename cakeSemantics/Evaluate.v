@@ -9,11 +9,9 @@ Require Import Equations.Prop.Equations.
 
 Require Import Ascii.
 Require Import List.
-Require Import ListDec.
 Import ListNotations.
 Require Import Lia.
 Require Import PeanoNat.
-Require Import Peano_dec.
 Require Import ZArith.
 Require Import ZArith.Zdigits.
 Require Import Zbool.
@@ -22,7 +20,7 @@ Require Import Zbool.
 (* Require Import Relation_Operators. *)
 (* ---------------------------------------------------------------------- *)
 (** ** Helper functions *)
-Definition ident_string_dec := Namespace.ident_eq_dec _ _ string_dec string_dec.
+(* Definition ident_string_dec := Namespace.ident_eq_dec _ _ string_dec string_dec. *)
 Definition ident_string_beq := CakeAST.ident_beq _ _ String.eqb String.eqb.
 
 (* ---------------------------------------------------------------------- *)
@@ -38,8 +36,8 @@ Definition store_assign {A : Type} (n : nat) (v : store_v A) (st : store A) : op
 (* ---------------------------------------------------------------------- *)
 (** ** Constructor comparison *)
 
-Definition same_ctor (s1 s2 : stamp) : bool :=
-  if stamp_eq_dec s1 s2 then true else false.
+Definition same_ctor := stamp_beq.
+(*   if stamp_eq_dec s1 s2 then true else false. *)
 
 (* ---------------------------------------------------------------------- *)
 (** ** Pattern matcher *)
@@ -140,7 +138,7 @@ Fixpoint do_eq (v1 v2 : val) : eq_result :=
                                  else if ctor_same_type cn1 cn2
                                       then Eq_val false
                                       else Eq_type_error
-  | Vectorv vs1, Vectorv vs2 => if eq_nat_dec (length vs1) (length vs2)
+  | Vectorv vs1, Vectorv vs2 => if Nat.eqb (length vs1) (length vs2)
                                then eq_result_list vs1 vs2
                                else Eq_val false
   | Closure _ _ _, Closure _ _ _ => Eq_val true
@@ -158,8 +156,7 @@ Definition do_opapp (vs : list val) : option (sem_env val * exp) :=
   | (Closure env nfun e)::v::[] =>
     Some (update_sev env (nsBind nfun v (sev env)), e)
   | (Recclosure env funs nfun)::v::[] =>
-    if NoDuplicates_dec String.string_dec
-                 (List.map (fun p => match p with (f,x,e) => f end) funs)
+    if nodup_str (List.map (fun p => match p with (f,x,e) => f end) funs)
     then match find_recfun nfun funs with
          | Some (n,e) =>
             let sev' := nsBind n v (build_rec_env funs env (sev env)) in
@@ -727,7 +724,7 @@ Equations evaluate_match {ffi' : Type} (pes : list (pat * exp)) (fuel : nat) (st
   : state ffi' * result (list val) val := {
   evaluate_match [] _ st _ _ err_v _ => (st, Rerr (Rraise err_v));
   evaluate_match ((p,e)::pes') fuel st env matched_v err_v f =>
-    if NoDuplicates_dec string_dec (pat_bindings p [])
+    if nodup_str (pat_bindings p [])
     then (match pmatch (sec env) (refs st) p matched_v [] with
           | Match env_v' =>
             f [e] fuel st
@@ -917,7 +914,7 @@ Equations? eval_or_match (sel : bool) (es : if sel then list exp else list (pat 
     };
 
   eval_or_match true [ELetrec funs e] fuel st env _ _ =>
-    if NoDup_dec string_dec (map (fun '(x,y,z) => x) funs)
+    if nodup_str (map (fun '(x,y,z) => x) funs)
     then eval_or_match true [e] fuel st (update_sev env (build_rec_env funs env (sev env))) uu uu
     else (st, Rerr (Rabort Rtype_error));
 
@@ -928,7 +925,7 @@ Equations? eval_or_match (sel : bool) (es : if sel then list exp else list (pat 
   eval_or_match false [] _ st _ _ err_v => (st, Rerr (Rraise err_v));
 
   eval_or_match false ((p,e)::pes') fuel st env matched_v err_v =>
-    if NoDuplicates_dec string_dec (pat_bindings p [])
+    if nodup_str (pat_bindings p [])
     then (match pmatch (sec env) (refs st) p matched_v [] with
           | Match env_v' =>
             eval_or_match true [e] fuel st
@@ -943,7 +940,7 @@ all:constructor; simp mutmeasure; simp size_exp; simp size_pes; try(lia).
 rewrite size_exps_rev. lia.
 specialize (size_exp_at_least_S e2). lia.
 specialize (size_exp_at_least_S e1). lia.
-Qed.
+Defined.
 
 Lemma Forall''_app : forall (T : Type) (P : T -> Type) (l : list T) (a : T), Forall'' P l -> P a -> Forall'' P (l ++ [a]).
   intros.
@@ -1221,6 +1218,7 @@ Proof.
  destruct d; simpl; lia.
 Qed.
 
+
 Equations? evaluate_decs (fuel : nat) (st : state nat) (env : sem_env val) (decl : list dec)
   : state nat * result (sem_env val) val by wf (size_decs decl) := {
     evaluate_decs _ st _ [] => (st, Rval empty_sem_env);
@@ -1235,7 +1233,7 @@ Equations? evaluate_decs (fuel : nat) (st : state nat) (env : sem_env val) (decl
         end;
 
     evaluate_decs fuel st env [Dlet locs p e] =>
-        if NoDuplicates_dec string_dec (pat_bindings p [])
+        if nodup_str (pat_bindings p [])
         then match eval_or_match true [e] fuel st env uu uu with
              | (st', Rval v) =>
                (st', match pmatch (sec env) (refs st') p (hd (Conv None []) v) [] with
@@ -1249,12 +1247,12 @@ Equations? evaluate_decs (fuel : nat) (st : state nat) (env : sem_env val) (decl
 
     evaluate_decs fuel st env [Dletrec locs funs] =>
         (st,
-         if NoDuplicates_dec string_dec (map (fun x => fst (fst x)) funs)
+         if nodup_str (map (fun x => fst (fst x)) funs)
          then Rval {| sev := build_rec_env funs env nsEmpty; sec := nsEmpty |}
          else Rerr (Rabort Rtype_error));
 
     evaluate_decs fuel st env [Dtype locs tds] =>
-        if UniqueCtorsInDefs_dec tds
+        if unique_ctros_in_defs tds
         then (state_update_next_type_stamp st (next_type_stamp st + List.length tds),
               Rval {| sev := nsEmpty; sec := build_tdefs (next_type_stamp st) tds |})
         else (st, Rerr (Rabort Rtype_error));
@@ -1291,11 +1289,11 @@ Proof.
   - assert (fold_addition_lt : forall (l : list nat) (m n : nat), m < m + n -> fold_left plus l m < fold_left plus l (m + n)).
     induction l; intros m n H.
     simpl; lia.
-    simpl. rewrite <- (Plus.plus_assoc m n a). rewrite (Plus.plus_comm n a). rewrite (Plus.plus_assoc m a n).
+    simpl. rewrite <- (Nat.add_assoc m n a). rewrite (Nat.add_comm n a). rewrite (Nat.add_assoc m a n).
     apply IHl. lia.
-    rewrite Plus.plus_comm.
+    rewrite Nat.add_comm.
     apply fold_addition_lt.
     specialize (size_dec_min_1 d2).
     specialize (size_dec_min_1 d1).
     lia.
-Qed.
+Defined.

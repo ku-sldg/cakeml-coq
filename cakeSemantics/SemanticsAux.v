@@ -316,7 +316,7 @@ Definition build_rec_env (funs : list (varN * varN * exp)) (cl_env : sem_env val
 Fixpoint find_recfun {A B : Type} (n : varN) (funs : list (varN * A * B)) : option (A * B) :=
   match funs with
   | [] => None
-  | (f,x,e)::funs' => if string_dec f n then Some (x,e) else find_recfun n funs'
+  | (f,x,e)::funs' => if String.eqb f n then Some (x,e) else find_recfun n funs'
   end.
 
 
@@ -390,12 +390,38 @@ Parameter shift64_lookup : forall (op : CakeAST.shift), word64 -> nat -> word64.
 
 Open Scope bool_scope.
 Open Scope nat_scope.
-Definition UniqueCtorsInDef (td : list tvarN * typeN * list (conN * list ast_t)) : Prop :=
-  let '(tvs,tn,condefs) := td in
-  NoDup (List.map (fun '(n,_) => n) condefs).
+(* Definition UniqueCtorsInDef (td : list tvarN * typeN * list (conN * list ast_t)) : Prop := *)
+(*   let '(tvs,tn,condefs) := td in *)
+(*   NoDup (List.map (fun '(n,_) => n) condefs). *)
 
-Definition UniqueCtorsInDefs (tds : typeDef) : Prop :=
-  List.Forall UniqueCtorsInDef tds.
+(* Definition UniqueCtorsInDefs (tds : typeDef) : Prop := *)
+(*   List.Forall UniqueCtorsInDef tds. *)
+
+Fixpoint string_in (s : string) (l : list string) : bool :=
+  match l with
+  | [] => false
+  | s'::l' => if String.eqb s s' then
+              true
+            else string_in s l'
+  end.
+
+Definition nodup_str (ls : list string) : bool :=
+  let fix helper (ls : list string) (seen : list string) : bool :=
+    match ls with
+    | [] => true
+    | s::ls' => if string_in s seen then
+                false
+              else helper ls' (s::seen)
+    end
+  in
+  helper ls [].
+
+Definition unique_ctors_in_def (td : list tvarN * typeN * list (conN * list ast_t)) : bool :=
+  let '(tvs,tn,condefs) := td in
+  nodup_str (List.map (fun '(n,_) => n) condefs).
+
+Definition unique_ctros_in_defs (tds : typeDef) : bool :=
+  forallb unique_ctors_in_def tds.
 
 Definition build_constrs (s : nat) (condefs : list (conN * (list ast_t)) ) :=
   List.map (fun '(conN,ts) => (conN,(List.length ts, TypeStamp conN s))) condefs.
@@ -415,10 +441,10 @@ Fixpoint build_tdefs (next_stamp : nat) (tds : list (list tvarN * typeN * list (
 
 Fixpoint val_to_list (v : val) : option (list val) :=
   match v with
-  | Conv (Some stamp) [] => if stamp_eq_dec stamp (TypeStamp "[]" list_type_num)
+  | Conv (Some stamp) [] => if stamp_beq stamp (TypeStamp "[]" list_type_num)
                            then Some []
                            else None
-  | Conv (Some stamp) [v1;v2] => if stamp_eq_dec stamp (TypeStamp "::" list_type_num)
+  | Conv (Some stamp) [v1;v2] => if stamp_beq stamp (TypeStamp "::" list_type_num)
                                 then match val_to_list v2 with
                                      | Some vs => Some (v1::vs)
                                      | None => None
@@ -435,11 +461,11 @@ Fixpoint list_to_val (vs : list val) : val :=
 
 Fixpoint val_to_char_list (v : val) : option (list char) :=
   match v with
-  | Conv (Some stamp) [] => if stamp_eq_dec stamp (TypeStamp "[]" list_type_num)
+  | Conv (Some stamp) [] => if stamp_beq stamp (TypeStamp "[]" list_type_num)
                            then Some []
                            else None
   | Conv (Some stamp) [Litv (CharLit c); v'] =>
-    if stamp_eq_dec stamp (TypeStamp "::" list_type_num)
+    if stamp_beq stamp (TypeStamp "::" list_type_num)
     then match val_to_char_list v' with
          | Some cs => Some (c::cs)
          | None => None
@@ -607,17 +633,18 @@ Fixpoint val_beq (v1 v2 : val) : bool :=
 (*     right; injection. intro. assumption. *)
 (* Defined. *)
 
-Lemma UniqueCtorsInDef_dec : forall (td : (list tvarN * typeN * list (conN * list ast_t))),
-    {UniqueCtorsInDef td} + {~ UniqueCtorsInDef td}.
-Proof.
-  unfold UniqueCtorsInDef. intro td.
-  destruct td. destruct p.
-  apply NoDuplicates_dec.
-  auto with DecidableEquality.
-Defined.
 
-Theorem UniqueCtorsInDefs_dec : forall (tds : typeDef), {UniqueCtorsInDefs tds} + {~ UniqueCtorsInDefs tds}.
-Proof.
-  apply Forall_dec.
-  apply UniqueCtorsInDef_dec.
-Defined.
+(* Lemma UniqueCtorsInDef_dec : forall (td : (list tvarN * typeN * list (conN * list ast_t))), *)
+(*     {UniqueCtorsInDef td} + {~ UniqueCtorsInDef td}. *)
+(* Proof. *)
+(*   unfold UniqueCtorsInDef. intro td. *)
+(*   destruct td. destruct p. *)
+(*   apply NoDuplicates_dec. *)
+(*   auto with DecidableEquality. *)
+(* Defined. *)
+
+(* Theorem UniqueCtorsInDefs_dec : forall (tds : typeDef), {UniqueCtorsInDefs tds} + {~ UniqueCtorsInDefs tds}. *)
+(* Proof. *)
+(*   apply Forall_dec. *)
+(*   apply UniqueCtorsInDef_dec. *)
+(* Defined. *)
