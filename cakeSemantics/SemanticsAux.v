@@ -405,16 +405,13 @@ Fixpoint string_in (s : string) (l : list string) : bool :=
             else string_in s l'
   end.
 
-Definition nodup_str (ls : list string) : bool :=
-  let fix helper (ls : list string) (seen : list string) : bool :=
-    match ls with
-    | [] => true
-    | s::ls' => if string_in s seen then
-                false
-              else helper ls' (s::seen)
-    end
-  in
-  helper ls [].
+Fixpoint nodup_str (ls : list string) : bool :=
+  match ls with
+  | [] => true
+  | s::ls' => if string_in s ls' then
+              false
+            else nodup_str ls'
+  end.
 
 Definition unique_ctors_in_def (td : list tvarN * typeN * list (conN * list ast_t)) : bool :=
   let '(tvs,tn,condefs) := td in
