@@ -76,7 +76,7 @@ Inductive op : Type :=
   | OpFpUop : fpuop -> op
   | OpFpBop : fpbop -> op
   | OpFpTop : fptop -> op
-(* Function application *)
+  (* Function application *)
   | Opapp : op
   (* Reference operations *)
   | Opassign : op
