@@ -8,7 +8,7 @@
    For the moment, I won't touch your current Word module. *)
 
 
-Require Import Arith.PeanoNat.
+Require Import Arith.
 Require Import Lia.
 Require Import ProofIrrelevance.
 
@@ -17,7 +17,7 @@ Inductive word (size : nat) : Type :=
 
 Definition word_equality (s : nat) (w x : word s) : bool :=
   match w, x with
-      | Word _ m _, Word _ n _ => EqNat.beq_nat m n
+      | Word _ m _, Word _ n _ => Nat.eqb m n
   end.
 
 Lemma word_eq_succ : forall (n0 n1 size : nat) (H0 : n0 < 2 ^ size) (H1 : n1 < 2 ^ size) (P0 : (S n0) < 2 ^ size) (P1 : (S n1) < 2 ^ size),
@@ -88,8 +88,8 @@ Proof.
       * apply Nat.lt_succ_diag_r.
     + rewrite Nat.sub_succ_r.
       rewrite Nat.sub_0_r.
-      apply Lt.lt_pred_n_n.
-      assumption.
+      apply Nat.lt_pred_l.
+      lia.
   - intros.
     apply IHn.
     + apply (Nat.lt_trans n (S n) (2^p)) in Q.
@@ -174,10 +174,10 @@ Theorem bitwise_max : forall (m n p : nat) (op : bool -> bool -> bool), m < 2^p 
   intros.
   assert (2 ^ p = S ( 2 ^ p - 1)) by lia.
   rewrite H1 in *.
-  apply Lt.le_lt_n_Sm.
-  apply Lt.lt_n_Sm_le in H.
-  apply Lt.lt_n_Sm_le in H0.
-  apply bitwise_max_lem; assumption. Qed.
+  apply Nat.lt_succ_r.
+  apply Nat.lt_succ_r in H.
+  apply Nat.lt_succ_r in H0.
+  apply bitwise_max_lem; lia. Qed.
 
 Definition word_and (size : nat) (w1 w2 : word size) : word size :=
   match w1, w2 with

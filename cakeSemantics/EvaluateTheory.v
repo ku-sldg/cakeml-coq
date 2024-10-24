@@ -141,8 +141,8 @@ Proof.
     simpl.
     destruct r.
     simpl.
-    rewrite app_assoc_reverse.
-    rewrite app_assoc_reverse.
+    rewrite app_assoc.
+    rewrite app_assoc.
     reflexivity.
     reflexivity.
     destruct s0.
@@ -187,14 +187,55 @@ Lemma eval_or_match_inc_fuel_res : forall (f : nat) (sel : bool)
     eval_or_match sel es (S f) st env match_v err_v = (st', res).
 Proof.
   intros.
-  (* 43 cases :>( *)
+  (* 47 cases :>( *)
   funelim (eval_or_match sel es f st env match_v err_v);
-  (* eliminates 8 cases *)
-  simp eval_or_match in *;
+  (* eliminates 6 cases *)
+  simp eval_or_match in *; auto;
+  try solve [rewrite Heq in H0, Heqcall;
+         apply Hind in Heq; try discriminate;
+         rewrite Heq in *; simpl in *;
+             inv H0;
+             auto];
+    try solve [rewrite Heq in *; simpl in *; auto];
+    try solve [rewrite Heq in H0, Heqcall;
+               apply Hind in Heq; try discriminate;
+               rewrite Heq in *; simpl in *; auto];
+    try solve [rewrite Heq in H1, Heqcall; simpl in *;
+               apply Hind in Heq; try discriminate;
+               rewrite Heq; simpl;
+               apply H; try assumption];
+    try solve [rewrite Heq0 in *; simpl in *;
+               rewrite Heq in H0, Heqcall;
+               apply Hind in Heq;
+               [rewrite Heq; simpl in *; auto|rewrite H0 in Heqcall; inv Heqcall; auto]];
+    try solve [rewrite Heq1 in *; simpl in *;
+               rewrite Heq0 in H0, Heqcall; apply Hind in Heq0;
+               [rewrite Heq0; simpl in *; auto|discriminate]];
+    try solve [rewrite Heq1 in H1, Heqcall; simpl in *;
+               rewrite Heq0 in *; simpl in *;
+               apply Hind in Heq1; simpl in *;
+               try discriminate;
+               rewrite Heq1; simpl in *;
+               rewrite Heq0; simpl;
+               rewrite Heq in *; simpl in *;
+               auto];
+    try solve [rewrite Heq1 in H0, Heqcall;
+               apply Hind in Heq1;
+               [rewrite Heq1; simpl;
+                rewrite Heq0 in *; simpl in *;
+                rewrite Heq in *; simpl in *;
+                rewrite H0 in Heqcall; inv Heqcall; auto
+               | discriminate]];
+    try solve [rewrite Heq in H1, Heqcall;
+               apply Hind in Heq;
+               [rewrite Heq; simpl in *;
+                break_match; auto | try discriminate]];
+  try solve [rewrite Heq in H1, Heqcall;
+             apply Hind in Heq;
+             [rewrite Heq; simpl in *;
+              break_match; auto;
+              break_match; auto | try discriminate]].
   (* eliminates 10 cases *)
-  try (rewrite Heq in H0, Heqcall;
-       apply Hind in Heq; (try discriminate);
-       rewrite Heq; simpl in *; assumption).
   - inv H0. contradiction.
   - break_match; try (assumption).
     apply H; assumption.
@@ -202,146 +243,35 @@ Proof.
     break_match; try assumption.
     apply H; assumption.
     eapply H0; try assumption; try reflexivity.
-  - rewrite Heq in H0, Heqcall; apply Hind in Heq; try (discriminate);
-    rewrite Heq in *; simpl in *.
-    assumption.
-    inv H0. assumption.
-  - rewrite Heq in Heqcall, H1.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq in *; simpl in *.
-    apply H; assumption.
-  - rewrite Heq in Heqcall, H0; simpl in *.
+  - rewrite Heq in H2, Heqcall;
+      apply Hind in Heq;
+      [rewrite Heq; simpl in *;
+       break_match; auto;
+       break_match; auto | try discriminate].
+  - rewrite Heq0 in H0, Heqcall;
+      apply Hind0 in Heq0.
+      + rewrite Heq0; simpl in *;
+          rewrite Heq in H0, Heqcall;
+          apply Hind in Heq.
+        * rewrite Heq; simpl in *; auto; rewrite H0 in Heqcall; inv Heqcall; auto.
+        * rewrite H0 in Heqcall; inv Heqcall; auto.
+      + discriminate.
+  - rewrite Heq0 in H0, Heqcall; simpl in *.
+    rewrite Heq in H0, Heqcall; simpl in *.
     apply Hind in Heq.
-    rewrite Heq in *; simpl in *.
-    assumption.
-    inv H0.
-    assumption.
-  - rewrite Heq in Heqcall, H0.
-    rewrite Heq in *; simpl in *.
-    assumption.
-  - rewrite Heq0 in *. simpl in *.
-    rewrite Heq in H0, Heqcall.
-    apply Hind in Heq.
-    rewrite Heq. simpl in *.
-    assumption.
-    rewrite H0 in Heqcall.
-    inv Heqcall. assumption.
-  - rewrite Heq1 in *. simpl in *. rewrite Heq0 in Heqcall, H0.
-    simpl in *. apply Hind in Heq0; try discriminate.
-    rewrite Heq0. simpl in *. rewrite Heq in *. simpl in *.
-    assumption.
-  - rewrite Heq1 in *. simpl in *.
-    rewrite Heq0 in H0, Heqcall.
-    apply Hind in Heq0; try discriminate.
-    rewrite Heq0. simpl in *.
-    rewrite Heq in *. simpl in *.
-    assumption.
-  - rewrite Heq in H0, Heqcall.
-    apply Hind in Heq.
-    rewrite Heq in *. simpl in *.
-    assumption.
-    rewrite H0 in Heqcall. inv Heqcall. assumption.
-  - rewrite Heq1 in H1, Heqcall. apply Hind in Heq1; try discriminate.
-    rewrite Heq1. simpl in *.
-    rewrite Heq0 in *. simpl in *.
-    rewrite Heq in *. simpl in *.
-    apply H; assumption.
-  - rewrite Heq1 in H0, Heqcall.
-    apply Hind in Heq1; try discriminate.
-    rewrite Heq1. simpl in *.
-    rewrite Heq0 in *; simpl in *.
-    rewrite Heq in *; simpl in *.
-    assumption.
-  - rewrite Heq1 in H0, Heqcall.
-    apply Hind in Heq1; try discriminate.
-    rewrite Heq1; simpl in *.
-    rewrite Heq0 in *; simpl in *.
-    rewrite Heq in *; simpl in *.
-    assumption.
-  - rewrite Heq1 in H0, Heqcall.
-    apply Hind in Heq1; try discriminate.
-    rewrite Heq1; simpl in *.
-    rewrite Heq0 in *; simpl in *.
-    rewrite Heq in *; simpl in *.
-    assumption.
-  - rewrite Heq in H1, Heqcall.
+    apply Hind0 in Heq0.
+    rewrite Heq0; simpl.
+    rewrite Heq; simpl.
+    auto.
+    discriminate.
+    discriminate.
+  - rewrite Heq0 in H0, Heqcall; simpl in *.
+    rewrite Heq in H0, Heqcall; simpl in *.
     apply Hind in Heq; try discriminate.
-    rewrite Heq in *. simpl in *.
-    break_match; try assumption.
-    apply H; assumption.
-  - rewrite Heq in H0, Heqcall.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq; simpl in *.
-    assumption.
-    rewrite H0 in Heqcall. inv Heqcall. assumption.
-  - rewrite Heq in H1, Heqcall.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq; simpl in *.
-    break_match; try assumption.
-    break_match; try assumption.
-    apply H; assumption.
-  - rewrite Heq in H0, Heqcall.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq. simpl in *.
-    assumption.
-    rewrite H0 in Heqcall. inv Heqcall. assumption.
-  - rewrite Heq in H2, Heqcall.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq; simpl in *.
-    break_match; try assumption.
-    apply H; try assumption.
-    break_match; try assumption.
-    apply H0; try assumption.
-  - rewrite Heq in H0, Heqcall.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq; simpl in *.
-    assumption.
-    rewrite H0 in Heqcall; inv Heqcall; assumption.
-  - rewrite Heq in H1, Heqcall.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq; simpl in *.
-    apply H; try assumption.
-  - rewrite Heq in H0, Heqcall.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq; simpl in *.
-    assumption.
-    rewrite H0 in Heqcall; inv Heqcall; assumption.
-  - rewrite Heq in H1, Heqcall.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq; simpl in *.
-    apply H; try assumption.
-  - rewrite Heq in H0, Heqcall.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq; simpl in *.
-    assumption.
-    rewrite H0 in Heqcall; inv Heqcall; assumption.
-  - rewrite Heq in H0, Heqcall.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq; simpl in *.
-    assumption.
-    rewrite H0 in Heqcall; inv Heqcall; assumption.
-  - rewrite Heq0 in H0, Heqcall.
     apply Hind0 in Heq0; try discriminate.
-    rewrite Heq0; simpl in *.
-    rewrite Heq in H0, Heqcall.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq; simpl in *.
-    assumption.
-    rewrite H0 in Heqcall; inv Heqcall; assumption.
-  - rewrite Heq0 in H0, Heqcall.
-    apply Hind0 in Heq0; try discriminate.
-    rewrite Heq0; simpl in *.
-    rewrite Heq in H0, Heqcall.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq; simpl in *.
-    assumption.
-  - rewrite Heq0 in H0, Heqcall.
-    apply Hind0 in Heq0; try discriminate.
-    rewrite Heq0; simpl in *.
-    rewrite Heq in H0, Heqcall.
-    apply Hind in Heq; try discriminate.
-    rewrite Heq; simpl in *.
-    assumption.
+    rewrite Heq0; simpl.
+    rewrite Heq; simpl.
+    auto.
 Qed.
 
 Lemma inc_fuel_same_val : forall (f : nat) (e : exp) (st st' : state ST)
@@ -479,24 +409,22 @@ Lemma eval_or_match_sel_length : forall sel es (f : nat) (st st' : state ST) (en
     length_helper sel es vs.
 Proof.
   intros.
-  funelim (eval_or_match sel es f st env match_v err_v).
-  - simp length_helper. simp eval_or_match in H. inv H. reflexivity.
-  - simp length_helper. simp eval_or_match in H. inv H. reflexivity.
-  - simp length_helper. simp eval_or_match in H. inv H. reflexivity.
-  - simp length_helper. simp eval_or_match in H. inv H.
-  - simp length_helper. simp eval_or_match in H0.
-    break_match.
-    apply H in H0.
-    simp length_helper in H0.
-    inv H0.
-  - simp length_helper. rewrite H0 in Heqcall.
-    apply H in Heqcall.
-    simp length_helper in Heqcall.
-  - simp length_helper. rewrite H0 in Heqcall.
-    apply H in Heqcall.
-    simp length_helper in Heqcall.
-  - simp length_helper. rewrite H in Heqcall.
-    inv Heqcall.
+  funelim (eval_or_match sel es f st env match_v err_v);
+    try solve [simp length_helper; simp eval_or_match in H; inv H; reflexivity];
+    try solve [simp length_helper; simp eval_or_match in H0;
+               break_match;
+               try apply H in H0;
+               simp length_helper in H0;
+               inv H0; auto];
+    try solve [simp length_helper; simp eval_or_match in *;
+               apply H in H0; auto];
+    try solve [rewrite H in Heqcall; inv Heqcall];
+    try solve [apply Hind in Heq; try rewrite H in Heqcall; try inv Heqcall;
+               simp length_helper in *];
+    try solve [rewrite H in Heqcall; inv Heqcall; simp length_helper; reflexivity];
+    try solve [rewrite H0 in Heqcall; apply H in Heqcall; simp length_helper in *];
+    try solve [apply Hind in Heq; simp length_helper in *; simpl in *;
+               rewrite H in Heqcall; inv Heqcall; auto].
   - break_match.
     + break_match.
       -- simp eval_or_match in *.
@@ -514,79 +442,81 @@ Proof.
       -- rewrite H1 in Heqcall.
          eapply H0 in Heqcall.
          simp length_helper in *.
-         reflexivity.
-         reflexivity.
+         auto.
     + rewrite H1 in Heqcall. inv Heqcall.
-  - apply Hind in Heq.
+  - rewrite H0 in Heqcall;
+    apply H in Heqcall;
+    simp length_helper in *;
+    auto.
+  - apply Hind in Heq1;
+      rewrite H0 in Heqcall;
+      simp length_helper in *;
+      apply H in Heqcall;
+      auto.
+  - rewrite H in Heqcall. simp length_helper in *;
+      simp eval_or_match in H;
+      rewrite Heq1 in H; simpl in H;
+      rewrite Heq0 in H; simpl in H.
+    simpl in Heq. rewrite Heq in H.
+    simpl in *.
+    apply Hind in Heq1.
     simp length_helper in *.
-    inv Heq.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
-  - apply Hind in Heq. rewrite H in Heqcall. inv Heqcall.
-    simp length_helper in *.
-  - rewrite H0 in Heqcall.
-    apply H in Heqcall.
-    simp length_helper in *.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall. simp length_helper. reflexivity.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall. simp length_helper. reflexivity.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H0 in Heqcall. apply H in Heqcall. simp length_helper in *.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
+    inv Heqcall.
     unfold list_result in H2.
-    break_match; try inv H2.
-    simp length_helper. reflexivity.
-  - rewrite H in Heqcall. inv Heqcall.
-  - apply Hind in Heq. simp length_helper in Heq. inv Heq.
+    break_match;
+      inv H2; auto.
   - rewrite H0 in Heqcall.
     break_match.
     apply H in Heqcall.
     simp length_helper in *.
+    auto.
     break_match.
+    simp length_helper in *.
     inv Heqcall.
-    simp length_helper; reflexivity.
+    auto.
     inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
-  - apply Hind in Heq. simp length_helper in Heq. inv Heq.
-  - break_match.
-    rewrite H0 in Heqcall. inv Heqcall. simp length_helper; reflexivity.
+  - rewrite H0 in Heqcall.
+    break_match; simp length_helper in *; inv Heqcall.
+    apply Hind in Heq.
+    simp length_helper in *.
+    auto.
     break_match.
-    rewrite H0 in Heqcall.
+    apply H in H2.
+    simp length_helper in H2.
+    auto.
+    inv H2.
+  - rewrite H1 in Heqcall.
+    break_match.
     apply H in Heqcall.
     simp length_helper in *.
-    rewrite H0 in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H1 in Heqcall. break_match.
-    apply H in Heqcall.
-    simp length_helper in *.
+    auto.
     break_match.
     apply H0 in Heqcall.
     simp length_helper in *.
+    auto.
     inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
-  - apply Hind in Heq. simp length_helper in Heq. inv Heq.
-  - rewrite H0 in Heqcall. apply H in Heqcall. simp length_helper in *.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H0 in Heqcall. apply H in Heqcall.
+  - rewrite H0 in Heqcall.
+    apply H in Heqcall.
     simp length_helper in *.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
-  - rewrite H in Heqcall. inv Heqcall.
+    auto.
+  - rewrite H0 in Heqcall.
+    apply H in Heqcall.
+    simp length_helper in *.
+    auto.
+  - rewrite H in Heqcall.
+    apply Hind in Heq.
     apply Hind0 in Heq0.
-    simp length_helper in Heq0. inv Heq0.
-  - rewrite H in Heqcall. inv Heqcall.
-    apply Hind in Heq. simp length_helper in *.
-    simpl. rewrite Heq. reflexivity.
+    simp length_helper in *.
+    inv Heq0.
+  - rewrite H in Heqcall.
+    apply Hind in Heq.
+    apply Hind0 in Heq0.
+    simp length_helper in *.
+    inv Heqcall.
+    destruct vs'.
+    simpl.
+    rewrite Heq. reflexivity.
+    inv Heq0.
 Qed.
 
 Theorem eval_or_match_false_length : forall (es : list (pat * exp)) (f : nat) (st st' : state ST) (env : sem_env val) (vs : list val) match_v err_v,
@@ -655,7 +585,7 @@ Proof.
     destruct r.
 
     assert (copyHeqp0 : (s1, Rval s2) = evaluate_decs fuel s (extend_dec_env s0 env) (d2 :: decl')) by assumption.
-    rewrite Heqp0 in Heqp0.
+    symmetry in Heqp0.
     eapply H0 in Heqp0.
     rewrite Heqp0.
     inv H1.
@@ -664,8 +594,6 @@ Proof.
     constructor.
     constructor.
     constructor.
-    symmetry. assumption.
-    reflexivity.
     inv H1.
     inv H1.
 Qed.

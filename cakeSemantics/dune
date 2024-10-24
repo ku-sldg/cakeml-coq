@@ -2,7 +2,7 @@
  (name CakeSem)
  (package cakeml-semantics)
  (modules Word Utils ffi.FFI ffi.SimpleIO Namespace CakeAST SemanticsAux Evaluate EvaluateTheory)
-  (libraries coq-core.plugins.extraction)
- (theories StructTact))
+ (plugins coq-core.plugins.extraction coq-equations)
+ (theories StructTact Equations))
 
 (include_subdirs qualified)

@@ -13,7 +13,6 @@ Import ListNotations.
 Require Import Lia.
 Require Import PeanoNat.
 Require Import ZArith.
-Require Import ZArith.Zdigits.
 Require Import Zbool.
 
 (* ---------------------------------------------------------------------- *)
@@ -175,7 +174,7 @@ Definition natFromInteger (size : nat) :=
       match n' with
       | O => O
       | S n'' =>
-        (2 ^ n' * (Z.to_nat (Zdigits.bit_value
+        (2 ^ n' * (Z.to_nat (Z.b2z
                                (Z.testbit (Z.of_nat n'') z)))
              + (helper n'' z))
       end
