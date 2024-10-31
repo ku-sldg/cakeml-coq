@@ -1,4 +1,4 @@
-(lang dune 3.8)
+(lang dune 3.16)
 (using coq 0.8)
 
 (name cakeml-semantics)
@@ -9,8 +9,9 @@
 (package
  (name cakeml-semantics)
  (depends
-  (coq-equations (>= 1.3+8.15))
-  (coq (>= 8.15.1)))
+  (coq-equations (= 1.3+8.17))
+  (coq (= 8.17.1))
+  (dune (= 3.16.0)))
  (synopsis "CakeML semantic definitions")
  (description  "")
  (maintainers   "tjbarclay@ku.edu")
