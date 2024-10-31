@@ -442,81 +442,63 @@ Proof.
       -- rewrite H1 in Heqcall.
          eapply H0 in Heqcall.
          simp length_helper in *.
-         auto.
+         reflexivity.
+         reflexivity.
     + rewrite H1 in Heqcall. inv Heqcall.
-  - rewrite H0 in Heqcall;
-    apply H in Heqcall;
-    simp length_helper in *;
-    auto.
-  - apply Hind in Heq1;
-      rewrite H0 in Heqcall;
-      simp length_helper in *;
-      apply H in Heqcall;
-      auto.
-  - rewrite H in Heqcall. simp length_helper in *;
-      simp eval_or_match in H;
-      rewrite Heq1 in H; simpl in H;
-      rewrite Heq0 in H; simpl in H.
-    simpl in Heq. rewrite Heq in H.
-    simpl in *.
+  - rewrite H in Heqcall.
     apply Hind in Heq1.
-    simp length_helper in *.
+    simp length_helper in Heq1.
     inv Heqcall.
     unfold list_result in H2.
-    break_match;
-      inv H2; auto.
-  - rewrite H0 in Heqcall.
-    break_match.
-    apply H in Heqcall.
-    simp length_helper in *.
-    auto.
-    break_match.
-    simp length_helper in *.
-    inv Heqcall.
-    auto.
-    inv Heqcall.
-  - rewrite H0 in Heqcall.
-    break_match; simp length_helper in *; inv Heqcall.
-    apply Hind in Heq.
-    simp length_helper in *.
-    auto.
-    break_match.
-    apply H in H2.
-    simp length_helper in H2.
-    auto.
-    inv H2.
+    break_match; inv H2.
+    reflexivity.
+  - break_match.
+    ++ rewrite H0 in Heqcall.
+       apply H in Heqcall.
+       simp length_helper in *;
+         auto.
+    ++ break_match.
+       rewrite H0 in Heqcall.
+       inv Heqcall.
+       simp length_helper in *.
+       reflexivity.
+       rewrite H0 in Heqcall.
+       inv Heqcall.
+  - break_match.
+    ++ rewrite H0 in Heqcall.
+       inv Heqcall.
+       reflexivity.
+    ++ rewrite H0 in Heqcall.
+       break_match; inv Heqcall.
+       apply H in Heqcall.
+       simp length_helper in *.
   - rewrite H1 in Heqcall.
-    break_match.
+    break_match; inv Heqcall.
     apply H in Heqcall.
     simp length_helper in *.
-    auto.
-    break_match.
+    break_match; inv Heqcall.
     apply H0 in Heqcall.
     simp length_helper in *.
-    auto.
-    inv Heqcall.
-  - rewrite H0 in Heqcall.
-    apply H in Heqcall.
-    simp length_helper in *.
-    auto.
-  - rewrite H0 in Heqcall.
-    apply H in Heqcall.
-    simp length_helper in *.
-    auto.
   - rewrite H in Heqcall.
     apply Hind in Heq.
     apply Hind0 in Heq0.
     simp length_helper in *.
+    inv Heqcall.
+    destruct vs.
+    inv Heq.
     inv Heq0.
   - rewrite H in Heqcall.
     apply Hind in Heq.
     apply Hind0 in Heq0.
     simp length_helper in *.
     inv Heqcall.
-    destruct vs'.
+    destruct vs''.
+    inv Heq.
+    inv Heq.
+    inv Heq0.
     simpl.
-    rewrite Heq. reflexivity.
-    inv Heq0.
+    rewrite H1.
+    reflexivity.
 Qed.
 
 Theorem eval_or_match_false_length : forall (es : list (pat * exp)) (f : nat) (st st' : state ST) (env : sem_env val) (vs : list val) match_v err_v,
@@ -594,6 +576,10 @@ Proof.
     constructor.
     constructor.
     constructor.
+    inv H1.
+    inv H1.
+    reflexivity.
+    reflexivity.
     inv H1.
     inv H1.
 Qed.
