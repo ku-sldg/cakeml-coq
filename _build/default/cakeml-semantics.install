@@ -1,0 +1,40 @@
+lib: [
+  "_build/install/default/lib/cakeml-semantics/META"
+  "_build/install/default/lib/cakeml-semantics/dune-package"
+  "_build/install/default/lib/cakeml-semantics/opam"
+]
+lib_root: [
+  "_build/install/default/lib/coq/user-contrib/CakeSem/CakeAST.glob" {"coq/user-contrib/CakeSem/CakeAST.glob"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/CakeAST.v" {"coq/user-contrib/CakeSem/CakeAST.v"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/CakeAST.vo" {"coq/user-contrib/CakeSem/CakeAST.vo"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/Evaluate.glob" {"coq/user-contrib/CakeSem/Evaluate.glob"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/Evaluate.v" {"coq/user-contrib/CakeSem/Evaluate.v"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/Evaluate.vo" {"coq/user-contrib/CakeSem/Evaluate.vo"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/EvaluateTheory.glob" {"coq/user-contrib/CakeSem/EvaluateTheory.glob"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/EvaluateTheory.v" {"coq/user-contrib/CakeSem/EvaluateTheory.v"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/EvaluateTheory.vo" {"coq/user-contrib/CakeSem/EvaluateTheory.vo"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/Namespace.glob" {"coq/user-contrib/CakeSem/Namespace.glob"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/Namespace.v" {"coq/user-contrib/CakeSem/Namespace.v"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/Namespace.vo" {"coq/user-contrib/CakeSem/Namespace.vo"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/SemanticsAux.glob" {"coq/user-contrib/CakeSem/SemanticsAux.glob"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/SemanticsAux.v" {"coq/user-contrib/CakeSem/SemanticsAux.v"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/SemanticsAux.vo" {"coq/user-contrib/CakeSem/SemanticsAux.vo"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/Utils.glob" {"coq/user-contrib/CakeSem/Utils.glob"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/Utils.v" {"coq/user-contrib/CakeSem/Utils.v"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/Utils.vo" {"coq/user-contrib/CakeSem/Utils.vo"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/Word.glob" {"coq/user-contrib/CakeSem/Word.glob"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/Word.v" {"coq/user-contrib/CakeSem/Word.v"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/Word.vo" {"coq/user-contrib/CakeSem/Word.vo"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/ffi/FFI.glob" {"coq/user-contrib/CakeSem/ffi/FFI.glob"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/ffi/FFI.v" {"coq/user-contrib/CakeSem/ffi/FFI.v"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/ffi/FFI.vo" {"coq/user-contrib/CakeSem/ffi/FFI.vo"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/ffi/SimpleIO.glob" {"coq/user-contrib/CakeSem/ffi/SimpleIO.glob"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/ffi/SimpleIO.v" {"coq/user-contrib/CakeSem/ffi/SimpleIO.v"}
+  "_build/install/default/lib/coq/user-contrib/CakeSem/ffi/SimpleIO.vo" {"coq/user-contrib/CakeSem/ffi/SimpleIO.vo"}
+  "_build/install/default/lib/coq/user-contrib/StructTact/StructTactics.glob" {"coq/user-contrib/StructTact/StructTactics.glob"}
+  "_build/install/default/lib/coq/user-contrib/StructTact/StructTactics.v" {"coq/user-contrib/StructTact/StructTactics.v"}
+  "_build/install/default/lib/coq/user-contrib/StructTact/StructTactics.vo" {"coq/user-contrib/StructTact/StructTactics.vo"}
+]
+doc: [
+  "_build/install/default/doc/cakeml-semantics/README.md"
+]

@@ -1,0 +1,8 @@
+* 2022-05-31
+  The current version of CakeML in HOL4 has added definitions to facilitate
+  an eval construct as used in repls, floating point semantics, and real numbers. This
+  includes changes to.
+  * ast
+  * semanticPrimitives
+  * the addition of fpOpt, fpSem, and fpVal
+  * the addition of realOps

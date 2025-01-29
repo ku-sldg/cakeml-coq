@@ -1,0 +1,62 @@
+* Code -> Concept
+** Environment
+   #+begin_src coq
+     Record sem_env (V : Type) := {
+                                   sev : namespace modN varN V;
+                                   sec : namespace modN conN (nat * stamp)
+                                 }.
+   #+end_src
+*** Two namespaces:
+     1. maps variable names to values
+     2. maps constructor names to constructor ids and stamps
+
+     both have names prefixed by module names
+
+** FFI State
+   #+begin_src coq
+     Definition ffi_state (ffi' : Type) := (((oracle ffi') * ffi') * (list io_event))%type.
+   #+end_src
+
+*** I don't really have a clue. I need to read through again
+
+** Store
+   #+begin_src coq
+     Inductive store_v (A : Type) : Type :=
+     (* Reference *)
+     | Refv : A -> store_v A
+     (* Byte array *)
+     | W8array : list word8 -> store_v A
+     (* Value array *)
+     | Varray : list A -> store_v A.
+
+     (* The nth item in the list is the value at location n *)
+     Definition store (A : Type) := list (store_v A).
+   #+end_src
+
+*** the store is a list of store_v values where each thing in the list is a location in memory (represented by nat)
+
+** State
+   #+begin_src coq
+     Record state (A : Type) :=
+       {
+         clock : nat;
+         refs : store val;
+         ffi : ffi_state A;
+         next_type_stamp : nat;
+         next_exn_stamp : nat
+       }.
+   #+end_src
+
+*** 5 components:
+    1. clock - essentially fuel to make the functional big-step semantics go
+    2. refs  - the current store
+    3. ffi   - the current ffi state
+    4. next_type_stamp - the next number to be used to identify user defined types/constructors
+    5. next_exn_stamp  - the next number to be used to identify user defined exceptions
+
+* Magnus says:
+  that the type checker is garanteed to prevent type errors at runtime so ignore runtime type checking
+  However pattern matching is a binding exception error and can be caught so it must be handled
+  Fallthroughs are still necessary to let exceptions go through :(
+
+* Verification means:

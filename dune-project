@@ -9,11 +9,11 @@
 (package
  (name cakeml-semantics)
  (depends
-  (coq-equations (= 1.3+8.17))
-  (coq (= 8.17.1))
-  (dune (= 3.16.0)))
+   coq-equations
+   coq
+   dune)
  (synopsis "CakeML semantic definitions")
- (description  "")
+ (description  "CakeML Definitions defined in Coq originally written to define a Gallina to CakeML translator.")
  (maintainers   "tjbarclay@ku.edu")
  (authors      "TJ Barclay")
 )

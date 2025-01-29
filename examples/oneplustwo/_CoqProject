@@ -1,0 +1,4 @@
+-R . CakeVerif
+-R /home/barclata/projects/sldg/cakeml-coq/cakeSemantics CakeSem
+-R /home/barclata/projects/sldg/cakeml-verif/src/infrastructure Infra
+OnePlusTwoVerif.v
